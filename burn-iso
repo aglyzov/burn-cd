@@ -1,0 +1,27 @@
+#!/bin/sh
+
+if [ $# -ne 1 ]; then
+	echo "Usage:  `basename \"$0\"` <image.iso>"
+	exit 2
+fi
+
+echo
+echo "Warning:  This script will burn file:"
+echo "Warning:	\"$1\" as Data-CD image."
+echo 'Warning:  You have 10 seconds to cancel this (Ctrl-C)'
+echo
+DUMMY=(9 8 7 6 5 4 3 2 1 "GO")
+for i in ${DUMMY[@]}; do
+	sleep 1
+	echo -n $i\ 
+done
+echo
+
+SIZE=( `du -m "$1"` )[0]
+
+if [ $SIZE -ge 702 ]; then
+	echo "Error!  Size of image file is grater than 702 MB"
+	exit 1
+fi
+
+cdrecord dev=/dev/hdc driveropts=burnfree gracetime=3 -v -overburn -eject -dao -data "$1"

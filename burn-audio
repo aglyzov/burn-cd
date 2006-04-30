@@ -1,0 +1,29 @@
+#!/bin/sh
+
+echo
+echo 'Warning:  This script will burn *.wav files as AudioCD'
+echo 'Warning:  You have 10 seconds to cancel this (Ctrl-C)'
+echo
+DUMMY=(9 8 7 6 5 4 3 2 1 "GO")
+for i in ${DUMMY[@]}; do
+	sleep 1
+	echo -n $i\ 
+done
+echo
+
+SIZE=( `du -sm` )[0]
+
+if [ $SIZE -ge 800 ]; then
+	echo "Error!  Size of all files is grater then 800 MB"
+	exit 1
+fi
+
+IFS=$'\n'
+TRACKS=`ls *.[wW][aA][vV] -1`
+
+if [ $? -ne 0 ]; then
+	echo "Error!  Can't find any *.wav in the current directory"
+	exit 1
+fi
+
+cdrecord dev=/dev/hdc driveropts=burnfree gracetime=3 -v -eject -tao -audio -pad $@ ${TRACKS[@]}
