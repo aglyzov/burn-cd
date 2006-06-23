@@ -5,7 +5,7 @@
 PROG = "burn-cd"
 
 VERSION = \
-"""%s version 1.3.1
+"""%s version 1.3.2
 Written by SmART, 2004-2006
 """ % PROG
 
@@ -567,7 +567,7 @@ if __name__ == "__main__":
 
 	def update_progress_bar( percent, first_pad=0 ):
 		bar_len = 53
-		sys.stdout.write( '\b'*bar_len+' '*first_pad+COLOR_9+'[' )
+		sys.stdout.write( '\r%s%s[' % (' '*first_pad,COLOR_9) )
 		eq_len = int( percent*(bar_len-2) / 100.0 )
 		sp_len = bar_len - 2 - eq_len
 		sys.stdout.write( COLOR_5+ '='*eq_len )
