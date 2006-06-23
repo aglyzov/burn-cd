@@ -651,7 +651,7 @@ if __name__ == "__main__":
 				sys.stdout.write( '%s%-50s%s' % (COLOR_1,s,COLOR_0) )
 				sys.stdout.flush()
 			elif 'Total bytes read/written:' in s:
-				update_progress_bar( 100 )
+				update_progress_bar( 100, 2 )
 			elif 'Average write speed' in s:
 				try:	avg_speed = s.split()[-1].strip()[:-1]
 				except:	pass
@@ -670,7 +670,7 @@ if __name__ == "__main__":
 				pieces = s.split( None, 5 )
 				total = float( pieces[4] )
 				written = float( pieces[2] )
-				update_progress_bar( written*100/total )
+				update_progress_bar( written*100/total, 2 )
 				out.append( s + '\n' )
 				s = ''
 
