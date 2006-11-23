@@ -22,6 +22,7 @@ VERBOSE_HELP	= "show more information during the process"
 ROOT_HELP	= "destination dir on the CD (defaults to '/')"
 DEVICE_HELP	= "CD-RW device (defaults to '/dev/hdc')"
 SPEED_HELP	= "tell cdrecord to burn CD on specific speed"
+SINGLE_HELP	= "force single-session mode"
 CHARSET_HELP	= "charset of the filenames (defaults to LOCALE)"
 NOCOLOR_HELP	= "disable colors"
 HELP_HELP	= "show this help"
@@ -34,6 +35,7 @@ HELP		= \
    -r<ROOT>, --root=<ROOT>    %s
    -d<DEV>,  --device=<DEV>   %s
    -s<N>,    --speed=<N>      %s
+   -1,       --single         %s
    -c<XYZ>,  --charset=<XYZ>  %s
    
    -i, --info		      %s
@@ -42,7 +44,7 @@ HELP		= \
    -h, --help		      %s
    --version		      %s
    --debug		      %s
-""" % ( ROOT_HELP, DEVICE_HELP, SPEED_HELP, CHARSET_HELP, INFO_HELP, \
+""" % ( ROOT_HELP, DEVICE_HELP, SPEED_HELP, SINGLE_HELP, CHARSET_HELP, INFO_HELP, \
 	NOCOLOR_HELP, VERBOSE_HELP, HELP_HELP, VERSION_HELP, DEBUG_HELP )
 
 COLOR_0		= "\033[m"
@@ -104,9 +106,10 @@ if __name__ == "__main__":
 
 	opts,filenames = [],[]
 	try:	opts, filenames = getopt.getopt(
-			sys.argv[1:], 'vnr:d:hc:is:',
+			sys.argv[1:], 'vnr:d:hc:is:1',
 			[ 'help', 'verbose', 'nocolor', 'root=', 'device=', \
-			  'speed=', 'charset=', 'version', 'info', 'debug' ]
+			  'speed=', 'charset=', 'version', 'info', 'debug', \
+			  'single' ]
 		)
 	except getopt.GetoptError:
 		print_usage()
@@ -120,6 +123,7 @@ if __name__ == "__main__":
 	except:	charset = None
 	device	= '/dev/hdc'
 	speed	= None 
+	single  = False
 	verbose = False
 	info	= False
 	debug	= False
@@ -146,6 +150,8 @@ if __name__ == "__main__":
 		elif opt in ['-s','--speed']:
 			try:	speed = int(val)
 			except:	pass
+		elif opt in ['-1','--single']:
+			single = True
 		elif opt in ['-c','--charset']:
 			charset = val
 		elif opt in ['-i','--info']:
@@ -206,7 +212,8 @@ if __name__ == "__main__":
 	
 	if verbose:
 		if mkisofs_exit_code == None:
-			val_str = 'version '+mkisofs_out[0].split(' ',2)[1]
+			mkisofs_ver = mkisofs_out[0].split(' ',2)[1]
+			val_str = 'version ' + mkisofs_ver.split(',',1)[0]
 			val_color = COLOR_2
 		else:
 			val_str = 'not found'
@@ -241,12 +248,16 @@ if __name__ == "__main__":
 
 	mkisofs_valid_opts = []
 	for s in mkisofs_out:
-		s = s.split()[0]
+		s = s.split( None, 1 )
+		if not s:  continue
+		s = s[0]
 		if s[0] == '-':
 			mkisofs_valid_opts += s.split(',')
 	cdrecord_valid_opts = []
 	for s in cdrecord_out:
-		s = s.split()[0]
+		s = s.split( None, 1 )
+		if not s: continue
+		s = s[0]
 		if s[0] == '-':
 			cdrecord_valid_opts += s.split(',')
 	
@@ -360,6 +371,7 @@ if __name__ == "__main__":
 	last_start = new_start = 0
 	total_space = free_space = 0
 	cdrw = False
+	dvd = False
 	disk_manufacturer = 'n/a'
 	disk_type = 'CD-ROM'
 	atip = False
@@ -385,6 +397,9 @@ if __name__ == "__main__":
 		elif '1T speed high:' in s:
 			try:	max_speed = int( s.split()[-1].strip() )
 			except:	pass
+		elif 'Found DVD media' in s:
+			disk_type = 'DVD-/+R(W)'
+			dvd = True
 		
 	if appendable:
 		print OK
@@ -484,7 +499,7 @@ if __name__ == "__main__":
 	if charset != None:
 		mkisofs_base += ' -input-charset %s' % ( charset )
 
-	if not blank:
+	if not blank and not single:
 		mkisofs_base += ' -C %lu,%lu -M %s' % ( last_start, new_start, device )
 	
 	mkisofs_base = filter_opts( mkisofs_base, mkisofs_valid_opts )
@@ -517,7 +532,11 @@ if __name__ == "__main__":
 		too_big = False
 		exit_flag = False
 		
-		if delta_size < multi_overhead:
+		if dvd:
+			if single:
+				write_single_session = True
+				mode_str = 'single session'
+		elif delta_size < multi_overhead:
 			if blank:
 				write_single_session = True
 				mode_str = 'single session'
@@ -588,7 +607,7 @@ if __name__ == "__main__":
 	else:	   speed_addon = ''
 	cdrecord_cmd = filter_opts( \
 		'cdrecord dev=%s driveropts=burnfree fs=24m gracetime=3 \
-		%s -force -v %s -waiti tsize=%lus -eject -' % \
+		%s -force -v %s -waiti tsize=%lus -immed -eject -' % \
 		( device, speed_addon, write_mode, new_size ), cdrecord_valid_opts )
 	
 	cmd = mkisofs_cmd+' | '+cdrecord_cmd+' 2>&1'
