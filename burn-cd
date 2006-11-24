@@ -1,65 +1,51 @@
 #!/usr/bin/python -O
 # -*- coding: cp1251 -*-
+"""
+Краткое описание:	удобная оболочка для cdrtools и dvd+rw-tools
+Автор:			SmART
+Последнее изменение:	24 ноября 2006
 
+"""
+import sys, os, stat, getopt, string
 
 PROG = "burn-cd"
 
 VERSION = \
-"""%s version 1.3.2
-Written by SmART, 2004-2006
-""" % PROG
+	"%s version 1.4a\n" \
+	"Written by SmART, 2004-2006" % PROG
 
-USAGE = \
-"""Usage:  %s [options] <file_or_dir_to_burn> [...]
-""" % PROG
+USAGE = "Usage:  %s [options] <file_or_dir_to_burn> [...]" % PROG
 
 DESCRIPTION = \
-"""Easily burns single & multi session CD-R(W) disks
-using two console programs: cdrecord and mkisofs.
+	"This is handy frontend for cdrtools/cdrkit and dvd+rw-tools\n" \
+	"for easy burning of single & multi session CD/DVD disks."
+
+HELP = \
+"""Options:
+   -r<ROOT>, --root=<ROOT>    destination dir on the CD (defaults to '/')
+   -d<DEV>,  --device=<DEV>   CD-RW device (defaults to '/dev/hdc')
+   -s<N>,    --speed=<N>      tell cdrecord to burn CD on specific speed
+   -1,       --single         force single-session mode
+   -c<XYZ>,  --charset=<XYZ>  charset of the filenames (defaults to LOCALE)
+   
+   -i, --info		      show drive/media info and exit
+   -n, --nocolor	      disable colors
+   -v, --verbose	      show more information during the process
+   -h, --help		      show this help and exit
+   --version		      show version of the program and exit
+   --debug		      enable debug messages during the process
 """
 
-VERBOSE_HELP	= "show more information during the process"
-ROOT_HELP	= "destination dir on the CD (defaults to '/')"
-DEVICE_HELP	= "CD-RW device (defaults to '/dev/hdc')"
-SPEED_HELP	= "tell cdrecord to burn CD on specific speed"
-SINGLE_HELP	= "force single-session mode"
-CHARSET_HELP	= "charset of the filenames (defaults to LOCALE)"
-NOCOLOR_HELP	= "disable colors"
-HELP_HELP	= "show this help"
-VERSION_HELP	= "show version of the program"
-INFO_HELP	= "show info and exit"
-DEBUG_HELP	= "show debug information during the process"
-
-HELP		= \
-"""Options:
-   -r<ROOT>, --root=<ROOT>    %s
-   -d<DEV>,  --device=<DEV>   %s
-   -s<N>,    --speed=<N>      %s
-   -1,       --single         %s
-   -c<XYZ>,  --charset=<XYZ>  %s
-   
-   -i, --info		      %s
-   -n, --nocolor	      %s
-   -v, --verbose	      %s
-   -h, --help		      %s
-   --version		      %s
-   --debug		      %s
-""" % ( ROOT_HELP, DEVICE_HELP, SPEED_HELP, SINGLE_HELP, CHARSET_HELP, INFO_HELP, \
-	NOCOLOR_HELP, VERBOSE_HELP, HELP_HELP, VERSION_HELP, DEBUG_HELP )
-
-COLOR_0		= "\033[m"
-COLOR_1		= "\033[1m"
-COLOR_2		= "\033[0;32m"
-COLOR_3		= "\033[1;32m"
-COLOR_4		= "\033[0;33m"
-COLOR_5		= "\033[1;33m"
-COLOR_6		= "\033[0;36m"
-COLOR_7		= "\033[1;36m"
-COLOR_8		= "\033[1;31m"
-COLOR_9		= "\033[1;34m"
-
-
-import sys, os, stat, getopt, string
+COLOR_0	= "\033[m"
+COLOR_1	= "\033[1m"
+COLOR_2	= "\033[0;32m"
+COLOR_3	= "\033[1;32m"
+COLOR_4	= "\033[0;33m"
+COLOR_5	= "\033[1;33m"
+COLOR_6	= "\033[0;36m"
+COLOR_7	= "\033[1;36m"
+COLOR_8	= "\033[1;31m"
+COLOR_9	= "\033[1;34m"
 
 
 def nocolor():
@@ -87,18 +73,6 @@ def escape_str( str ):
 	str = str.replace( "\015", "\\\015" )
 	return str
 
-def print_usage():
-	print USAGE
-
-def print_version():
-	print VERSION
-
-def print_description():
-	print DESCRIPTION
-
-def print_help():
-	print HELP
-
 
 if __name__ == "__main__":
 	
@@ -112,9 +86,9 @@ if __name__ == "__main__":
 			  'single' ]
 		)
 	except getopt.GetoptError:
-		print_usage()
-		print_description()
-		print_help()
+		print USAGE
+		print DESCRIPTION
+		print HELP
 		sys.exit(1)
 	
 	root	= '/'
@@ -130,11 +104,11 @@ if __name__ == "__main__":
 
 	for opt, val in opts:
 		if opt in ['-h','--help']:
-			print_usage()
-			print_help()
+			print USAGE
+			print HELP
 			sys.exit(0)
 		elif opt in ['--version']:
-			print_version()
+			print VERSION
 			sys.exit(0)
 		elif opt in ['-v','--verbose']:
 			verbose = True
@@ -159,9 +133,9 @@ if __name__ == "__main__":
 			verbose = True
 	
 	if len(filenames) == 0 and not info:
-		print_usage()
-		print_description()
-		print_help()
+		print USAGE
+		print DESCRIPTION
+		print HELP
 		sys.exit(2)
 	
 	root = '/' + escape_str( root ).lstrip('/')
@@ -169,12 +143,9 @@ if __name__ == "__main__":
 
 	OK = COLOR_9+'['+COLOR_3+'ok'+COLOR_9+']'+COLOR_0
 
-
 	cmd = string.join( sys.argv )
 	if debug:
 		sys.stdout.write( '%s%s%s\n' % (COLOR_4,cmd,COLOR_0) )
-		
-
 	
 	sys.stdout.write( COLOR_3+'*'+COLOR_0 )
 	s = ' Checking cdr-tools...'
@@ -720,4 +691,4 @@ if __name__ == "__main__":
 			sys.stdout.flush()
 		sys.exit(1)
 	
-
+# vim:tw=0:ts=8:fdm=marker
