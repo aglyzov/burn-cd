@@ -8,6 +8,7 @@
 """
 import sys, os, stat, getopt, string
 
+# Глобальные переменные {{{
 PROG = "burn-cd"
 
 VERSION = \
@@ -46,43 +47,14 @@ COLOR_6	= "\033[0;36m"
 COLOR_7	= "\033[1;36m"
 COLOR_8	= "\033[1;31m"
 COLOR_9	= "\033[1;34m"
+#}}}
 
-
-def nocolor():
-	global	COLOR_0, COLOR_1, COLOR_2, COLOR_3, COLOR_4, \
-		COLOR_5, COLOR_6, COLOR_7, COLOR_8, COLOR_9
-	
-	COLOR_0 = COLOR_1 = COLOR_2 = COLOR_3 = COLOR_4 = \
-	COLOR_5 = COLOR_6 = COLOR_7 = COLOR_8 = COLOR_9 = ''
-
-def escape_str( str ):
-	#str = str.replace( "\\", "\\\\" )
-	str = str.replace( "\"", "\\\"" )
-	str = str.replace( "\'", "\\\'" )
-	str = str.replace( " ", "\\ " )
-	str = str.replace( "=", "\\=" )
-	str = str.replace( "(", "\\(" )
-	str = str.replace( ")", "\\)" )
-	str = str.replace( "[", "\\[" )
-	str = str.replace( "]", "\\]" )
-	str = str.replace( ";", "\\;" )
-	str = str.replace( "&", "\\&" )
-	str = str.replace( "|", "\\|" )
-	str = str.replace( "\011", "\\\011" )
-	str = str.replace( "\012", "\\\012" )
-	str = str.replace( "\015", "\\\015" )
-	return str
-
-
-if __name__ == "__main__":
-	
-	if not sys.stdout.isatty():  nocolor()
-
-	opts,filenames = [],[]
+def parse_cmd_line():	#{{{
+	opts, filenames = [], []
 	try:	opts, filenames = getopt.getopt(
 			sys.argv[1:], 'vnr:d:hc:is:1',
-			[ 'help', 'verbose', 'nocolor', 'root=', 'device=', \
-			  'speed=', 'charset=', 'version', 'info', 'debug', \
+			[ 'help', 'verbose', 'nocolor', 'root=', 'device=',
+			  'speed=', 'charset=', 'version', 'info', 'debug',
 			  'single' ]
 		)
 	except getopt.GetoptError:
@@ -140,6 +112,37 @@ if __name__ == "__main__":
 	
 	root = '/' + escape_str( root ).lstrip('/')
 	root = root.rstrip('/')
+#}}}
+def nocolor():	#{{{1
+	global	COLOR_0, COLOR_1, COLOR_2, COLOR_3, COLOR_4, \
+		COLOR_5, COLOR_6, COLOR_7, COLOR_8, COLOR_9
+	
+	COLOR_0 = COLOR_1 = COLOR_2 = COLOR_3 = COLOR_4 = \
+	COLOR_5 = COLOR_6 = COLOR_7 = COLOR_8 = COLOR_9 = ''
+#}}}1
+def escape_str( str ):	#{{{1
+	#str = str.replace( "\\", "\\\\" )
+	str = str.replace( "\"", "\\\"" )
+	str = str.replace( "\'", "\\\'" )
+	str = str.replace( " ", "\\ " )
+	str = str.replace( "=", "\\=" )
+	str = str.replace( "(", "\\(" )
+	str = str.replace( ")", "\\)" )
+	str = str.replace( "[", "\\[" )
+	str = str.replace( "]", "\\]" )
+	str = str.replace( ";", "\\;" )
+	str = str.replace( "&", "\\&" )
+	str = str.replace( "|", "\\|" )
+	str = str.replace( "\011", "\\\011" )
+	str = str.replace( "\012", "\\\012" )
+	str = str.replace( "\015", "\\\015" )
+	return str
+#}}}1
+
+if __name__ == "__main__":	#{{{
+	# если stdout - не терминал, выключаем цвет
+	if not sys.stdout.isatty():  nocolor()
+
 
 	OK = COLOR_9+'['+COLOR_3+'ok'+COLOR_9+']'+COLOR_0
 
@@ -690,5 +693,6 @@ if __name__ == "__main__":
 			sys.stdout.write( COLOR_0 )
 			sys.stdout.flush()
 		sys.exit(1)
+#}}}
 	
 # vim:tw=0:ts=8:fdm=marker
