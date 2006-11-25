@@ -3,7 +3,7 @@
 """
 Краткое описание:	удобная оболочка для cdrtools и dvd+rw-tools
 Автор:			SmART
-Последнее изменение:	24 ноября 2006
+Последнее изменение:	25 ноября 2006
 
 """
 import sys, os, stat, getopt, string
@@ -12,7 +12,7 @@ import sys, os, stat, getopt, string
 PROG = "burn-cd"
 
 VERSION = \
-	"%s version 1.4a\n" \
+	"%s version 1.5a\n" \
 	"Written by SmART, 2004-2006" % PROG
 
 USAGE = "Usage:  %s [options] <file_or_dir_to_burn> [...]" % PROG
@@ -26,94 +26,95 @@ HELP = \
    -r<ROOT>, --root=<ROOT>    destination dir on the CD (defaults to '/')
    -d<DEV>,  --device=<DEV>   CD-RW device (defaults to '/dev/hdc')
    -s<N>,    --speed=<N>      tell cdrecord to burn CD on specific speed
-   -1,       --single         force single-session mode
    -c<XYZ>,  --charset=<XYZ>  charset of the filenames (defaults to LOCALE)
+   -z,       --zero           blank RW-media before burning (if needed)
    
    -i, --info		      show drive/media info and exit
-   -n, --nocolor	      disable colors
+   -n, --no-color	      disable colors
    -v, --verbose	      show more information during the process
    -h, --help		      show this help and exit
    --version		      show version of the program and exit
    --debug		      enable debug messages during the process
 """
+COLOR_0		= "\033[m"
+COLOR_1		= "\033[1m"
+COLOR_2		= "\033[0;32m"
+COLOR_3		= "\033[1;32m"
+COLOR_4		= "\033[0;33m"
+COLOR_5		= "\033[1;33m"
+COLOR_6		= "\033[0;36m"
+COLOR_7		= "\033[1;36m"
+COLOR_8		= "\033[1;31m"
+COLOR_9		= "\033[1;34m"
 
-COLOR_0	= "\033[m"
-COLOR_1	= "\033[1m"
-COLOR_2	= "\033[0;32m"
-COLOR_3	= "\033[1;32m"
-COLOR_4	= "\033[0;33m"
-COLOR_5	= "\033[1;33m"
-COLOR_6	= "\033[0;36m"
-COLOR_7	= "\033[1;36m"
-COLOR_8	= "\033[1;31m"
-COLOR_9	= "\033[1;34m"
+OK 		= COLOR_9+'['+COLOR_3+'ok'+COLOR_9+']'+COLOR_0
+ASTERISK	= COLOR_3+'*'+COLOR_0
+
+mmc_profiles	= {
+	0x0000:	'Reserved',
+	0x0001:	'Non-removable Disk',
+	0x0002:	'Removable Disk',
+	0x0003:	'MO Erasable',
+	0x0004:	'MO Write Once',
+	0x0005:	'AS-MO',
+	
+	0x0008:	'CD-ROM',
+	0x0009:	'CD-R',
+	0x000A:	'CD-RW',
+	
+	0x0010:	'DVD-ROM',
+	0x0011:	'DVD-R sequential recording',
+	0x0012:	'DVD-RAM',
+	0x0013:	'DVD-RW restricted overwrite',
+	0x0014:	'DVD-RW sequential overwrite',
+	0x0015:	'DVD-R/DL sequential recording',
+	0x0016:	'DVD-R/DL layer jump recording',
+	
+	0x001A:	'DVD+RW',
+	0x001B:	'DVD+R',
+	
+	0x0020:	'DDCD-ROM',
+	0x0021:	'DDCD-R',
+	0x0022:	'DDCD-RW',
+	
+	0x002A:	'DVD+RW/DL',
+	0x002B:	'DVD+R/DL',
+	
+	0x0040:	'BD-ROM',
+	0x0041:	'BD-R sequential recording',
+	0x0042:	'BD-R random recording',
+	0x0043:	'BD-RE',
+	
+	0x0050:	'HD DVD-ROM',
+	0x0051:	'HD DVD-R',
+	0x0052:	'HD DVD-RAM',
+
+	0xFFFF:	'No standard Profile'
+}
+
+write		= sys.stdout.write
+flush		= sys.stdout.flush
+
+root		= '/'
+lang		= os.getenv( 'LANG' )
+try:	charset = lang.split('.')[1].lower()
+except:	charset = None
+device		= '/dev/hdc'
+speed		= None 
+single  	= False
+verbose		= False
+info		= False
+debug		= False
+media		= None
+dvd 		= False
+
+mkisofs_out	= None
+cdrecord_out	= None
+isoinfo		= False
+growisofs	= False
 #}}}
 
-def parse_cmd_line():	#{{{
-	opts, filenames = [], []
-	try:	opts, filenames = getopt.getopt(
-			sys.argv[1:], 'vnr:d:hc:is:1',
-			[ 'help', 'verbose', 'nocolor', 'root=', 'device=',
-			  'speed=', 'charset=', 'version', 'info', 'debug',
-			  'single' ]
-		)
-	except getopt.GetoptError:
-		print USAGE
-		print DESCRIPTION
-		print HELP
-		sys.exit(1)
-	
-	root	= '/'
-	lang = os.getenv( 'LANG' )
-	try:	charset = lang.split('.')[1].lower()
-	except:	charset = None
-	device	= '/dev/hdc'
-	speed	= None 
-	single  = False
-	verbose = False
-	info	= False
-	debug	= False
-
-	for opt, val in opts:
-		if opt in ['-h','--help']:
-			print USAGE
-			print HELP
-			sys.exit(0)
-		elif opt in ['--version']:
-			print VERSION
-			sys.exit(0)
-		elif opt in ['-v','--verbose']:
-			verbose = True
-		elif opt in ['--debug']:
-			debug = True
-			verbose = True
-		elif opt in ['-n','--nocolor']:
-			nocolor()
-		elif opt in ['-r','--root']:
-			root = val
-		elif opt in ['-d','--device']:
-			device = val
-		elif opt in ['-s','--speed']:
-			try:	speed = int(val)
-			except:	pass
-		elif opt in ['-1','--single']:
-			single = True
-		elif opt in ['-c','--charset']:
-			charset = val
-		elif opt in ['-i','--info']:
-			info = True
-			verbose = True
-	
-	if len(filenames) == 0 and not info:
-		print USAGE
-		print DESCRIPTION
-		print HELP
-		sys.exit(2)
-	
-	root = '/' + escape_str( root ).lstrip('/')
-	root = root.rstrip('/')
-#}}}
-def nocolor():	#{{{1
+def no_color():	#{{{1
 	global	COLOR_0, COLOR_1, COLOR_2, COLOR_3, COLOR_4, \
 		COLOR_5, COLOR_6, COLOR_7, COLOR_8, COLOR_9
 	
@@ -138,231 +139,292 @@ def escape_str( str ):	#{{{1
 	str = str.replace( "\015", "\\\015" )
 	return str
 #}}}1
-
-if __name__ == "__main__":	#{{{
-	# если stdout - не терминал, выключаем цвет
-	if not sys.stdout.isatty():  nocolor()
-
-
-	OK = COLOR_9+'['+COLOR_3+'ok'+COLOR_9+']'+COLOR_0
-
-	cmd = string.join( sys.argv )
-	if debug:
-		sys.stdout.write( '%s%s%s\n' % (COLOR_4,cmd,COLOR_0) )
+def filter_opts( cmd, valid_opts ):	#{{{
+	global debug
 	
-	sys.stdout.write( COLOR_3+'*'+COLOR_0 )
-	s = ' Checking cdr-tools...'
-	sys.stdout.write( '%s%-50s%s' % (COLOR_1,s,COLOR_0) )
-	sys.stdout.flush()
+	cmd = cmd.split()
+	new_cmd = []
+	for op in cmd:
+		if len(op)>1 and op[0] == '-' and op not in valid_opts:
+			if debug:
+				write( 'stripped:  %s\n' % op )
+				flush()
+		else:
+			new_cmd.append( op )
+	return string.join( new_cmd )
+#}}}
+def get_valid_opts( prog_out ):	#{{{
+	valid_opts = []
+	for s in prog_out:
+		s = s.split( None, 1 )
+		if not s:  continue
+		s = s[0]
+		if s[0] == '-':
+			valid_opts += s.split(',')
+	return valid_opts
+#}}}
+
+def run_cmd( cmd ):	#{{{
+	ch_out = os.popen( cmd )
+	out = [ s for s in ch_out ]
+	exit_code = ch_out.close()
+
+	return out, exit_code
+#}}}
+
+def print_debug( s, color=COLOR_4 ):	#{{{
+	if not debug:  return
+	sys.stdout.write( '%s%s%s\n' % (color, s, COLOR_0) )
+#}}}
+def print_task( s ):	#{{{
+	write( '%s %s%-50s%s' % (ASTERISK, COLOR_1, s, COLOR_0) )
+	if debug:  print
+#}}}
+def print_error( s ):	#{{{
+	print COLOR_5+'['+COLOR_8+ s +COLOR_5+']'+COLOR_0
+#}}}
+def print_key_value( key, val, val_color=COLOR_2 ):	#{{{
+	key_str = '%s:' % key
+	write(
+		'  %s%-16s%s%s%s\n' % \
+		( COLOR_6, key_str, val_color, val, COLOR_0 )
+	)
+#}}}
+def print_version( prog, ver ):	#{{{
+	if ver:
+		val_str = 'version %s' % ver
+		val_color = COLOR_2
+	else:
+		val_str = 'not found'
+		val_color = COLOR_4
+	print_key_value( prog, val_str, val_color )
+#}}}
+def print_prog_out( out ):	#{{{
+	global debug
+
+	write( '  %s.....\n' % COLOR_8 )
+	if not debug:  out = out[-10:]
+	for s in out:  write( '  ' + s )
+	write( COLOR_0 )
+#}}}
+
+def parse_cmd_line():	#{{{
+	global	root, lang, charset, device, speed, single, \
+		verbose, info, debug, media, dvd
+
+	opts, filenames = [], []
+	try:	opts, filenames = getopt.getopt(
+			sys.argv[1:], 'vnr:d:hc:is:1',
+			[ 'help', 'verbose', 'no-color', 'root=', 'device=',
+			  'speed=', 'charset=', 'version', 'info', 'debug',
+			  'single' ]
+		)
+	except getopt.GetoptError:
+		print USAGE
+		print DESCRIPTION
+		print HELP
+		sys.exit(1)
+	
+	for opt, val in opts:
+		if opt in ['-h','--help']:
+			print USAGE
+			print HELP
+			sys.exit(0)
+		elif opt in ['--version']:
+			print VERSION
+			sys.exit(0)
+		elif opt in ['-v','--verbose']:
+			verbose = True
+		elif opt in ['--debug']:
+			debug = True
+			verbose = True
+		elif opt in ['-n','--no_color']:
+			no_color()
+		elif opt in ['-r','--root']:
+			root = val
+		elif opt in ['-d','--device']:
+			device = val
+		elif opt in ['-s','--speed']:
+			try:	speed = int(val)
+			except:	pass
+		elif opt in ['-1','--single']:
+			single = True
+		elif opt in ['-c','--charset']:
+			charset = val
+		elif opt in ['-i','--info']:
+			info = True
+			verbose = True
+	
+	if len(filenames) == 0 and not info:
+		print USAGE
+		print DESCRIPTION
+		print HELP
+		sys.exit(2)
+	
+	root = '/' + escape_str( root ).lstrip('/')
+	root = root.rstrip('/')
+#}}}
+def check_programs():	#{{{
+	global mkisofs_out, cdrecord_out, isoinfo, growisofs 
+
+	print_task('Checking programs...')
 
 	cmd = 'mkisofs -version 2>/dev/null && mkisofs -help 2>&1'
-	if debug:
-		sys.stdout.write( '\n%s%s%s\n' % (COLOR_4,cmd,COLOR_0) )
-	ch_out = os.popen( cmd )
-	out = [ s for s in ch_out ]
-	exit_code = ch_out.close()
-
-	mkisofs_out = out
-	mkisofs_exit_code = exit_code
+	print_debug( cmd )
+	flush()
+	mkisofs_out, mkisofs_exit_code = run_cmd( cmd )
 	
 	cmd = '(cdrecord -version 2>/dev/null | head -n1 ) && cdrecord -help 2>&1'
-	if debug:
-		sys.stdout.write( '%s%s%s\n' % (COLOR_4,cmd,COLOR_0) )
-	ch_out = os.popen( cmd )
-	out = [ s for s in ch_out ]
-	exit_code = ch_out.close()
-
-	cdrecord_out = out
-	cdrecord_exit_code = exit_code
+	print_debug( cmd )
+	flush()
+	cdrecord_out, cdrecord_exit_code = run_cmd( cmd )
 	
+	cmd = 'isoinfo -version 2>/dev/null'
+	print_debug( cmd )
+	flush()
+	isoinfo_out, isoinfo_exit_code = run_cmd( cmd )
+	
+	cmd = 'growisofs --version 2>/dev/null | head -n1'
+	print_debug( cmd )
+	flush()
+	growisofs_out, growisofs_exit_code = run_cmd( cmd )
 	
 	if mkisofs_exit_code == None and cdrecord_exit_code == None:
 		print OK
 		exit_flag = False
 	else:
-		error_str = 'not found'
-		print COLOR_5+'['+COLOR_8+error_str+COLOR_5+']'+COLOR_0
+		print_error('not found')
 		exit_flag = True
 	
 	if verbose:
+		# mkisofs
+		val_str = None
 		if mkisofs_exit_code == None:
 			mkisofs_ver = mkisofs_out[0].split(' ',2)[1]
-			val_str = 'version ' + mkisofs_ver.split(',',1)[0]
-			val_color = COLOR_2
-		else:
-			val_str = 'not found'
-			val_color = COLOR_8
-
-		key_str = 'mkisofs:'
-		sys.stdout.write( '  %s%-16s%s%s%s\n'
-			% ( COLOR_6, key_str, val_color, val_str, COLOR_0 ) )
+			val_str = mkisofs_ver.split(',',1)[0]
+		print_version( 'mkisofs', val_str )
 		
+		# cdrecord
+		val_str = None
 		if cdrecord_exit_code == None:
-			val_str = 'version '+cdrecord_out[0].split(' ',2)[1]
-			val_color = COLOR_2
-		else:
-			val_str = 'not found'
-			val_color = COLOR_8
-	
-		key_str = 'cdrecord:'
-		sys.stdout.write( '  %s%-16s%s%s%s\n'
-			% ( COLOR_6, key_str, val_color, val_str, COLOR_0 ) )
-			
-		sys.stdout.flush()
+			val_str = cdrecord_out[0].split(' ',2)[1]
+		print_version( 'cdrecord', val_str )
 		
-	if exit_flag:
-		if verbose:
-			sys.stdout.write( '  %s.....\n' % COLOR_8 )
-			if not debug:  out = out[-10:]
-			for s in out:
-				sys.stdout.write( '  ' + s )
-			sys.stdout.write( COLOR_0 )
-			sys.stdout.flush()
-		sys.exit(1)
-
-	mkisofs_valid_opts = []
-	for s in mkisofs_out:
-		s = s.split( None, 1 )
-		if not s:  continue
-		s = s[0]
-		if s[0] == '-':
-			mkisofs_valid_opts += s.split(',')
-	cdrecord_valid_opts = []
-	for s in cdrecord_out:
-		s = s.split( None, 1 )
-		if not s: continue
-		s = s[0]
-		if s[0] == '-':
-			cdrecord_valid_opts += s.split(',')
-	
-
-	def filter_opts( cmd, valid_opts ):
-		global debug
+		# isoinfo
+		val_str = None
+		if isoinfo_exit_code == None:
+			val_str = isoinfo_out[0].split(' ',2)[1]
+			isoinfo = True
+		print_version( 'isoinfo', val_str )
 		
-		if debug:
-			sys.stdout.write( '%s\n' % COLOR_0 )
-
-		cmd = cmd.split()
-		new_cmd = []
-		for op in cmd:
-			if len(op)>1 and op[0] == '-' and op not in valid_opts:
-				if debug:
-					sys.stdout.write( 'stripped:  %s\n' % op )
-					sys.stdout.flush()
-			else:
-				new_cmd.append( op )
-					
-		return string.join( new_cmd )
-
+		# growisofs
+		val_str = None
+		if growisofs_exit_code == None:
+			try:
+				val_str = growisofs_out[0].split(' ',5)[5]
+				val_str = val_str.split(',',1)[0]
+				growisofs = True
+			except:	pass
+		print_version( 'growisofs', val_str )
 	
-	sys.stdout.write( COLOR_3+'*'+COLOR_0 )
-	s = ' Looking for a disk...'
-	sys.stdout.write( '%s%-50s%s' % (COLOR_1,s,COLOR_0) )
-	sys.stdout.flush()
+		flush()
+		
+	if not exit_flag:  return
+
+	if verbose:
+		out = mkisofs_out + cdrecord_out
+		print_prog_out( out )
+		flush()
+	sys.exit(1)
+#}}}
+def check_disk_in_drive():	#{{{
+	global cdrecord_valid_opts, media, dvd, device, mmc_profiles
+
+	print_task('Looking for a disk in drive...')
+	flush()
 
 	cmd = filter_opts( 'cdrecord dev=%s -load -silent -v 2>&1' % device, cdrecord_valid_opts )
-	if debug:
-		sys.stdout.write( '\n%s%s%s\n' % (COLOR_4,cmd,COLOR_0) )
-	ch_out = os.popen( cmd )
-	out = [ s for s in ch_out ]
-	exit_code = ch_out.close()
+	print_debug( cmd )
+	out, exit_code = run_cmd( cmd )
 	
+	error_str = 'unknown'
+	match_wrong_dev = "Cannot open '%s'." % device
+	for s in out:
+		if match_wrong_dev in s:
+			error_str = 'wrong device'
+		elif 'Current:' in s:
+			media = s.split()[1]
+			if mmc_profiles.has_key( media ):
+				media = mmc_profiles[ media ]
+			if media == 'none':
+				media = None
+				error_str = 'no disk'
+			elif media[:3] == 'DVD':
+				dvd = True
 	if exit_code == None:
 		print OK
 		exit_flag = False
 	else:
-		error_str = 'unknown'
-		match_wrong_dev = "Cannot open '%s'." % device
-		match_no_disk = "No disk"
-		for s in out:
-			if match_wrong_dev in s:
-				error_str = 'wrong device'
-			elif match_no_disk in s:
-				error_str = 'no disk'
-		print COLOR_5+'['+COLOR_8+error_str+COLOR_5+']'+COLOR_0
+		print_error( error_str )
 		exit_flag = True
 	
 	if verbose:
-		key_str = 'Device:'
-		sys.stdout.write( '  %s%-16s%s%s%s\n'
-			% ( COLOR_6, key_str, COLOR_2, device, COLOR_0 ) )
+		print_key_value( 'Device', device )
 		for s in out:
 			if 'Vendor_info' in s:
 				try:
 					val_str = s.split( '\'', 2 )[1].strip()
-					key_str = 'Vendor:'
-					sys.stdout.write( '  %s%-16s%s%s%s\n'
-						% ( COLOR_6, key_str, COLOR_2, val_str, COLOR_0 ) )
+					print_key_value( 'Vendor', val_str )
 				except:	pass
 			if 'Identifi' in s:
 				try:
 					val_str = s.split( '\'', 2 )[1].strip()
-					key_str = 'Model:'
-					sys.stdout.write( '  %s%-16s%s%s%s\n'
-						% ( COLOR_6, key_str, COLOR_2, val_str, COLOR_0 ) )
+					print_key_value( 'Model', val_str )
 				except:	pass
 			if 'Revision' in s:
 				try:
 					val_str = s.split( '\'', 2 )[1].strip()
-					key_str = 'Firmware:'
-					sys.stdout.write( '  %s%-16s%s%s%s\n'
-						% ( COLOR_6, key_str, COLOR_2, val_str, COLOR_0 ) )
+					print_key_value( 'Firmware', val_str )
 				except:	pass
 			if 'Device seems to be' in s:
 				try:
 					val_str = s.split( ':', 1 )[1].strip()[:-1]
-					key_str = 'Type:'
-					sys.stdout.write( '  %s%-16s%s%s%s\n'
-						% ( COLOR_6, key_str, COLOR_2, val_str, COLOR_0 ) )
+					print_key_value( 'Type', val_str )
 				except:	pass
-		sys.stdout.flush()
+		flush()
 	
-	if exit_flag:
-		if verbose:
-			sys.stdout.write( '  %s.....\n' % COLOR_8 )
-			if not debug:  out = out[-10:]
-			for s in out:
-				sys.stdout.write( '  ' + s )
-			sys.stdout.write( COLOR_0 )
-			sys.stdout.flush()
-		sys.exit(1)
+	if not exit_flag:  return
 
-
-	sys.stdout.write( COLOR_3+'*'+COLOR_0 )
-	s = ' Checking disk type...'
-	sys.stdout.write( '%s%-50s%s' % (COLOR_1,s,COLOR_0) )
-	sys.stdout.flush()
+	if verbose:
+		print_prog_out( out )
+		flush()
+	sys.exit(1)
+#}}}
+def check_CD_disk():	#{{{
+	global media, device, cdrecord_valid_opts
+	print_task( 'Checking disk type...' )
 
 	cmd = filter_opts( 'cdrecord dev=%s -msinfo -silent -v 2>&1' % device, cdrecord_valid_opts )
-	if debug:
-		sys.stdout.write( '\n%s%s%s\n' % (COLOR_4,cmd,COLOR_0) )
-	ch_out = os.popen( cmd )
-	out = [ s for s in ch_out ]
-	exit_code = ch_out.close()
-	
+	print_debug( cmd )
+	flush()
+	out, exit_code = run_cmd( cmd )
+
 	appendable = True
 	blank = False
 	last_start = new_start = 0
 	total_space = free_space = 0
-	cdrw = False
-	dvd = False
-	disk_manufacturer = 'n/a'
-	disk_type = 'CD-ROM'
+	manufacturer = 'n/a'
+	disk_type = media
 	atip = False
 	max_speed = 0
 	for s in out:
 		if 'ATIP info from disk' in s:
 			atip = True
-		elif 'Is erasable' in s:
-			cdrw = True
-			disk_type = 'CD-RW'
-		elif 'Is not erasable' in s:
-			disk_type = 'CD-R'
 		elif 'ATIP start of lead out' in s:
 			try:	total_space = long( s.split(':',1)[1].strip().split()[0] )
 			except:	pass
 		elif 'Manufacturer' in s:
-			try:	disk_manufacturer = s.split(':',1)[1].strip()
+			try:	manufacturer = s.split(':',1)[1].strip()
 			except:	pass
 		elif 'Cannot read session offset' in s:
 			blank = True
@@ -371,17 +433,21 @@ if __name__ == "__main__":	#{{{
 		elif '1T speed high:' in s:
 			try:	max_speed = int( s.split()[-1].strip() )
 			except:	pass
-		elif 'Found DVD media' in s:
-			disk_type = 'DVD-/+R(W)'
-			dvd = True
 		
 	if appendable:
 		print OK
 		exit_flag = False
 	else:
-		print COLOR_5+'['+COLOR_8+'not writable'+COLOR_5+']'+COLOR_0
+		if 'RW' in media:
+			err_str = 'need to blank'
+			out += [ '.....\n',
+				 'You need to blank RW-media.\n',
+				 'Try to add -z to the options list.\n',
+				 'CAUTION: previous information on disk will be lost\n' ]
+		else:	err_str = 'not writable'
+		print_error( err_str )
 		exit_flag = True
-	
+
 	if blank:
 		free_space = total_space
 		disk_type += ' (blank)'
@@ -395,37 +461,142 @@ if __name__ == "__main__":	#{{{
 		disk_type += ' (fixated)'
 	
 	if verbose:
-		key_str = 'Disk:'
-		sys.stdout.write( '  %s%-16s%s%s%s\n'
-			% ( COLOR_6, key_str, COLOR_2, disk_type, COLOR_0 ) )
-		key_str = 'Manufacturer:'
-		sys.stdout.write( '  %s%-16s%s%s%s\n'
-			% ( COLOR_6, key_str, COLOR_2, disk_manufacturer, COLOR_0 ) )
+		print_key_value( 'Disk', disk_type )
+		print_key_value( 'Manufacturer', manufacturer )
 		if max_speed:
-			key_str = 'Maximum speed:'
-			sys.stdout.write( '  %s%-16s%s%dx%s\n'
-				% ( COLOR_6, key_str, COLOR_2, max_speed, COLOR_0 ) )
+			print_key_value( 'Maximum speed', max_speed )
 		if total_space:
-			key_str = 'Total space:'
-			sys.stdout.write( '  %s%-16s%s%.1f MB%s\n'
-				% ( COLOR_6, key_str, COLOR_2, total_space/512.0, COLOR_0 ) )
-			key_str = 'Free space:'
-			sectors = free_space
-			sys.stdout.write( '  %s%-16s%s%.1f MB (%u%%)%s\n'
-				% ( COLOR_6, key_str, COLOR_2, sectors/512.0, sectors*100.0/total_space + 0.5, COLOR_0 ) )
+			spc = '%.1f MB' % (total_space/512.0)
+			print_key_value( 'Total space', spc )
+			spc = '%.1f MB (%u%%)' % ( free_space/512.0, free_space*100.0/total_space+0.5 )
+			print_key_value( 'Free space', spc )
+		flush()
 	
-	if exit_flag:
-		if verbose:
-			sys.stdout.write( '  %s.....\n' % COLOR_8 )
-			if not debug:  out = out[-10:]
-			for s in out:
-				sys.stdout.write( '  ' + s )
-			sys.stdout.write( COLOR_0 )
-			sys.stdout.flush()
-		sys.exit(1)
+	if not exit_flag:  return
 
-	if info:
-		sys.exit()
+	if verbose:
+		print_prog_out( out )
+		flush()
+	sys.exit(1)
+#}}}
+def check_DVD_disk():	#{{{
+	global media, device, cdrecord_valid_opts
+	print_task( 'Checking disk type...' )
+
+	cmd = filter_opts( 'cdrecord dev=%s -atip -silent -v 2>&1' % device, cdrecord_valid_opts )
+	print_debug( cmd )
+	flush()
+	out, exit_code = run_cmd( cmd )
+
+	blank = False
+	total_space = free_space = 0
+	manufacturer = None
+	media_id = None
+	#book_type = 'unknown'
+	disk_type = media
+	disk_size = '120mm'
+	for s in out:
+		if not manufacturer and 'Manufacturer:' in s:
+			try:	manufacturer = s.split('\'')[1]
+			except:	pass
+		elif not media_id and 'Media type:' in s:
+			try:	media_id = s.split('\'')[1]
+			except:	pass
+		elif 'disc size:' in s:
+			try:	disk_size = s.split()[2]
+			except:	pass
+		#elif 'book type:' in s:
+		#	try:	book_type = s.split( None, 2 )[2][:-1]
+		#	except:	pass
+		elif 'blank:' in s:
+			try:	blank = bool( s.split()[3] == '1' )
+			except:	pass
+	# полный объём диска по-умолчанию
+	if disk_size == '120mm':
+		if '/DL' in media:
+			total_space = 4173824
+		else:
+			total_space = 2295104
+	else:
+		if '/DL' in media:
+			total_space = 1298828
+		else:
+			total_space = 714544
+	
+	appendable = 'DVD+R' in media
+		
+	if appendable:
+		print OK
+		exit_flag = False
+	else:
+		if 'RW' in media:
+			err_str = 'need to blank'
+			out += [ '.....\n',
+				 'You need to blank RW-media.\n',
+				 'Try to add -z to the options list.\n',
+				 'CAUTION: previous information on disk will be lost\n'	]
+		else:	err_str = 'not writable'
+		print_error( err_str )
+		exit_flag = True
+
+	if blank:
+		free_space = total_space
+		disk_type += ' (blank)'
+	elif appendable:
+		cmd = 'isoinfo -d dev=%s 2>&1' % device
+		print_debug( cmd )
+		flush()
+		out, exit_code = run_cmd( cmd )
+		used_space = 0
+		for s in out:
+			if not 'Volume size is:' in s:  continue
+			try:	used_space = long( s.split(':')[1] )
+			except:	pass
+		free_space = total_space - used_space
+		disk_type += ' (multisession)'
+	else:
+		disk_type += ' (fixated)'
+	
+	if verbose:
+		print_key_value( 'Disk', disk_type )
+		#print_key_value( 'Book type', book_type )
+		print_key_value( 'Physical size', disk_size )
+		if media_id:  manufacturer += '/'+media_id
+		print_key_value( 'Media ID', manufacturer or 'n/a' )
+		if total_space:
+			spc = '%.1f MB' % (total_space/(512.0))
+			print_key_value( 'Total space', spc )
+			spc = '%.1f MB (%u%%)' % ( free_space/(512.0), free_space*100.0/total_space+0.5 )
+			print_key_value( 'Free space', spc )
+		flush()
+	
+	if not exit_flag:  return
+
+	if verbose:
+		print_prog_out( out )
+		flush()
+	sys.exit(1)
+#}}}
+
+if __name__ == "__main__":	#{{{
+	# если stdout - не терминал, выключаем цвет
+	if not sys.stdout.isatty():  no_color()
+
+	parse_cmd_line()
+
+	cmd = string.join( sys.argv )
+	print_debug( cmd )
+
+	check_programs()
+	mkisofs_valid_opts = get_valid_opts( mkisofs_out )
+	cdrecord_valid_opts = get_valid_opts( cdrecord_out )
+	
+	check_disk_in_drive()
+	if dvd:
+		check_DVD_disk()
+	else:	check_CD_disk()
+
+	if info:  sys.exit()
 
 	fnames = []
 	for f in filenames:
@@ -433,7 +604,7 @@ if __name__ == "__main__":	#{{{
 		try:	f_stat = os.stat( f )
 		except:
 			if debug:
-				sys.stdout.write( '%sNot a file, link or dir. Skipped:  %s\n' % (COLOR_0,f) )
+				write( '%sNot a file, link or dir. Skipped:  %s\n' % (COLOR_0,f) )
 			continue
 		mode = f_stat[ stat.ST_MODE ]
 		f = escape_str( f )
@@ -448,24 +619,24 @@ if __name__ == "__main__":	#{{{
 			prefix = root + '/='
 			ok = True
 		elif debug:
-			sys.stdout.write( '%sNot a file, link or dir. Skipped:  %s\n' % (COLOR_0,f) )
+			write( '%sNot a file, link or dir. Skipped:  %s\n' % (COLOR_0,f) )
 			
 		if ok:
 			if root == '' and not dir:  prefix = ''
 			fnames.append( prefix + f )
-	sys.stdout.flush()
+	flush()
 	
 	if len(fnames) == 0:
-		sys.stdout.write( '\n%sNothing to write! Exiting.%s\n' % (COLOR_8,COLOR_0) )
+		write( '\n%sNothing to write! Exiting.%s\n' % (COLOR_8,COLOR_0) )
 		sys.exit(3)
 	
 	fnames = string.join( fnames )
 	
 
-	sys.stdout.write( COLOR_3+'*'+COLOR_0 )
+	write( COLOR_3+'*'+COLOR_0 )
 	s = ' Calculating new session size...'
-	sys.stdout.write( '%s%-50s%s' % (COLOR_1,s,COLOR_0) )
-	sys.stdout.flush()
+	write( '%s%-50s%s' % (COLOR_1,s,COLOR_0) )
+	flush()
 
 	mkisofs_base = \
 		'mkisofs -r -J -l -D -joliet-long -allow-leading-dots -allow-lowercase \
@@ -483,7 +654,7 @@ if __name__ == "__main__":	#{{{
 	
 	cmd = mkisofs_print
 	if debug:
-		sys.stdout.write( '\n%s%s%s\n' % (COLOR_4,cmd,COLOR_0) )
+		write( '\n%s%s%s\n' % (COLOR_4,cmd,COLOR_0) )
 	ch_out = os.popen( cmd )
 	out = [ s for s in ch_out ]
 	exit_code = ch_out.close()
@@ -534,41 +705,41 @@ if __name__ == "__main__":	#{{{
 		key_str = 'Session size:'
 		try:	sess_size = '%.1f MB (%.1f MB)' % ((new_size+multi_overhead)/512.0,new_size/512.0)
 		except:	sess_size = 'n/a'
-		sys.stdout.write( '  %s%-16s%s%s%s\n'
+		write( '  %s%-16s%s%s%s\n'
 			% ( COLOR_6, key_str, COLOR_2, sess_size, COLOR_0 ) )
 		key_str = 'Burning mode:'
 		sess_mode = '%s' % (mode_str)
-		sys.stdout.write( '  %s%-16s%s%s%s\n'
+		write( '  %s%-16s%s%s%s\n'
 			% ( COLOR_6, key_str, COLOR_2, sess_mode, COLOR_0 ) )
 			
 	if exit_flag:
 		if verbose:
-			sys.stdout.write( '  %s.....\n' % COLOR_8 )
+			write( '  %s.....\n' % COLOR_8 )
 			if not debug:  out = out[-10:]
 			for s in out:
-				sys.stdout.write( '  ' + s )
-			sys.stdout.write( COLOR_0 )
-			sys.stdout.flush()
+				write( '  ' + s )
+			write( COLOR_0 )
+			flush()
 		sys.exit(1)
 	
 
-	sys.stdout.write( COLOR_3+'*'+COLOR_0 )
+	write( COLOR_3+'*'+COLOR_0 )
 	s = ' Burning... '
-	sys.stdout.write( '%s%s' % (COLOR_1,s) )
-	sys.stdout.flush()
+	write( '%s%s' % (COLOR_1,s) )
+	flush()
 	
 
 	def update_progress_bar( percent, first_pad=0 ):
 		bar_len = 53
-		sys.stdout.write( '\r%s%s[' % (' '*first_pad,COLOR_9) )
+		write( '\r%s%s[' % (' '*first_pad,COLOR_9) )
 		eq_len = int( percent*(bar_len-2) / 100.0 )
 		sp_len = bar_len - 2 - eq_len
-		sys.stdout.write( COLOR_5+ '='*eq_len )
+		write( COLOR_5+ '='*eq_len )
 		if 0 < eq_len < bar_len-2:
-			sys.stdout.write( COLOR_8+ '\b*' )
-		sys.stdout.write( ' '*sp_len )
-		sys.stdout.write( COLOR_9+']' )
-		sys.stdout.flush()
+			write( COLOR_8+ '\b*' )
+		write( ' '*sp_len )
+		write( COLOR_9+']' )
+		flush()
 
 	if write_single_session:
 		if raw_mode:
@@ -586,7 +757,7 @@ if __name__ == "__main__":	#{{{
 	
 	cmd = mkisofs_cmd+' | '+cdrecord_cmd+' 2>&1'
 	if debug:
-		sys.stdout.write( '\n%s%s%s\n' % (COLOR_4,cmd,COLOR_0) )
+		write( '\n%s%s%s\n' % (COLOR_4,cmd,COLOR_0) )
 	ch_out = os.popen( cmd )
 	out = []
 	while True:
@@ -602,15 +773,15 @@ if __name__ == "__main__":	#{{{
 		s += c
 		if c == '.':
 			if 'Operation starts.' in s:
-				sys.stdout.write( '\b'*25 + '...' + ' '*22 + '\n' )
-				sys.stdout.flush()
+				write( '\b'*25 + '...' + ' '*22 + '\n' )
+				flush()
 				update_progress_bar( 0, 2 )
 				out.append( s+'\n' )
 				break
 			elif ' seconds.' in s:
 				sec = s.split()[-2]
-				sys.stdout.write( '\b'*b_num+'(starts in '+COLOR_5+sec+COLOR_0+COLOR_1+' seconds)' )
-				sys.stdout.flush()
+				write( '\b'*b_num+'(starts in '+COLOR_5+sec+COLOR_0+COLOR_1+' seconds)' )
+				flush()
 				b_num = 21
 				out.append( s+'\n' )
 		elif c in '\b\n':
@@ -629,20 +800,20 @@ if __name__ == "__main__":	#{{{
 		s += c
 		if c == '\n':
 			if 'Fixating...' in s:
-				sys.stdout.write( '\n' )
+				write( '\n' )
 				if verbose:
 					key_str = 'Average speed:'
-					sys.stdout.write( '  %s%-16s%s%s%s\n'
+					write( '  %s%-16s%s%s%s\n'
 						% ( COLOR_6, key_str, COLOR_2, avg_speed, COLOR_0 ) )
 					key_str = 'Writing time:'
-					sys.stdout.write( '  %s%-16s%s%s%s\n'
+					write( '  %s%-16s%s%s%s\n'
 						% ( COLOR_6, key_str, COLOR_2, writing_time, COLOR_0 ) )
 				
 				fixating_flag = True
-				sys.stdout.write( COLOR_3+'*'+COLOR_0 )
+				write( COLOR_3+'*'+COLOR_0 )
 				s = ' Fixating...'
-				sys.stdout.write( '%s%-50s%s' % (COLOR_1,s,COLOR_0) )
-				sys.stdout.flush()
+				write( '%s%-50s%s' % (COLOR_1,s,COLOR_0) )
+				flush()
 			elif 'Total bytes read/written:' in s:
 				update_progress_bar( 100, 2 )
 			elif 'Average write speed' in s:
@@ -681,17 +852,17 @@ if __name__ == "__main__":	#{{{
 	
 	if verbose:
 		key_str = 'Fixating time:'
-		sys.stdout.write( '  %s%-16s%s%s%s\n'
+		write( '  %s%-16s%s%s%s\n'
 			% ( COLOR_6, key_str, COLOR_2, fixating_time, COLOR_0 ) )
 			
 	if exit_flag:
 		if verbose:
-			sys.stdout.write( '  %s.....\n' % COLOR_8 )
+			write( '  %s.....\n' % COLOR_8 )
 			if not debug:  out = out[-10:]
 			for s in out:
-				sys.stdout.write( '  ' + s )
-			sys.stdout.write( COLOR_0 )
-			sys.stdout.flush()
+				write( '  ' + s )
+			write( COLOR_0 )
+			flush()
 		sys.exit(1)
 #}}}
 	
