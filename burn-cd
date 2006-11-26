@@ -3,7 +3,7 @@
 """
 Краткое описание:	удобная оболочка для cdrtools и dvd+rw-tools
 Автор:			SmART
-Последнее изменение:	26 ноября 2006
+Последнее изменение:	27 ноября 2006
 
 """
 import sys, os, stat, getopt, string, time
@@ -12,7 +12,7 @@ import sys, os, stat, getopt, string, time
 PROG = "burn-cd"
 
 VERSION = \
-	"%s version 1.5a\n" \
+	"%s version 1.5-alpha2\n" \
 	"Written by SmART, 2004-2006\n" % PROG
 
 USAGE = "Usage:  %s [options] <file_or_dir_to_burn> [...]\n" % PROG
@@ -296,7 +296,7 @@ def parse_cmd_line():	#{{{
 			info = True
 			verbose = True
 	
-	if len(filenames) == 0 and not info:
+	if len(filenames) == 0 and not (info or zero):
 		print USAGE
 		print DESCRIPTION
 		print HELP
@@ -665,16 +665,78 @@ def build_file_list():	#{{{
 	flush()
 	
 	if len(fnames) == 0:
-		write( '\n%sNothing to write! Exiting.%s\n' % (COLOR_4,COLOR_0) )
+		write( '%sNothing to write! Exiting.%s\n' % (COLOR_4,COLOR_0) )
 		sys.exit(3)
 	
 	fnames = string.join( fnames )
 #}}}
 def blank_cdrw():	#{{{
-	global blank
-
+	global blank, device
 	blank = True
-	pass	# TODO
+
+	write( '%s*%s %sBlanking CD-RW... ' % (COLOR_3, COLOR_0, COLOR_1) )
+	flush()
+
+	cmd = 'cdrecord blank=fast gracetime=3 dev=%s -force -v 2>&1' % device
+	print_debug( cmd )
+	
+	ch_out = os.popen( cmd )
+	out = []
+	while True:
+		s = ch_out.readline( 200 )
+		if s == '':  break
+		out.append( s )
+		if 'Starting to write' in s:  break
+	b_num = 0
+	s = ''
+	while True:
+		c = ch_out.read(1)
+		if c == '':  break
+		s += c
+		if c == '.':
+			if 'Operation starts.' in s:
+				write( '\b'*b_num + ' '*32 )
+				flush()
+				out.append( s+'\n' )
+				break
+			elif ' seconds.' in s:
+				sec = s.split()[-2]
+				write( '\b'*b_num+'(starts in '+COLOR_5+sec+COLOR_0+COLOR_1+' seconds)' )
+				flush()
+				b_num = 21
+				out.append( s+'\n' )
+		elif c in '\b\n':
+			if len(s) > 1:
+				out.append( s[:-1] + '\n' )
+			s = ''
+	blank_time = None
+	while True:
+		s = ch_out.readline( 200 )
+		if s == '':  break
+		out.append( s )
+		if 'Blanking time:' in s:
+			try:
+				last_item = s.split()[-1].strip()
+				t = float( last_item[:-1] )
+				blank_time = '%u sec' % round( t )
+			except:	pass
+	exit_code = ch_out.close()
+	
+	if exit_code == None:
+		print OK
+		exit_flag = False
+		if verbose:  print_key_value( 'Blanking time', blank_time or 'n/a' )
+	else:
+		print_error( 'error' )
+		exit_flag = True
+	flush()
+			
+	if not exit_flag:  return
+
+	if verbose:
+		print_prog_out( out )
+		flush()
+	sys.exit(1)
 #}}}
 def check_new_session():	#{{{
 	global	verbose, charset, last_start, new_start, device, \
@@ -778,6 +840,7 @@ def burn_cd_disk():	#{{{
 	
 	cmd = 'mkisofs %s 2>/dev/null | %s 2>&1' % (mkisofs_opts, cdrecord_cmd) 
 	print_debug( cmd )
+
 	ch_out = os.popen( cmd )
 	out = []
 	while True:
