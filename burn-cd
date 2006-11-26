@@ -3,7 +3,7 @@
 """
 Краткое описание:	удобная оболочка для cdrtools и dvd+rw-tools
 Автор:			SmART
-Последнее изменение:	25 ноября 2006
+Последнее изменение:	26 ноября 2006
 
 """
 import sys, os, stat, getopt, string
@@ -481,9 +481,8 @@ def check_cd_disk():	#{{{
 		if 'RW' in media:
 			err_str = 'need to blank'
 			out += [ '.....\n',
-				 'You need to blank RW-media.\n',
-				 'Try to add -z to the options list.\n',
-				 'CAUTION: previous information on disk will be lost\n' ]
+				 'You need to blank RW-media. Add -z to the options list.\n',
+				 'CAUTION: any previous information on disk will be lost\n' ]
 		else:	err_str = 'not writable'
 		print_error( err_str )
 		exit_flag = True
@@ -550,11 +549,11 @@ def check_dvd_disk():	#{{{
 			try:	blank = bool( s.split()[3] == '1' )
 			except:	pass
 	# объём диска по-умолчанию
-	d = disk_size + ' ' + media.split(1)[0]
+	d = disk_size + ' ' + media.split( None, 1 )[0]
 	total_space = disk_capacities[ d ]
 	
 	appendable = True
-	if 'ROM' in media or '-RW' in media:
+	if 'ROM' in media:
 		appendable = False
 	
 	if zero and 'RW' in media:
@@ -565,13 +564,13 @@ def check_dvd_disk():	#{{{
 		print OK
 		exit_flag = False
 	else:
-		if 'RW' in media:
-			err_str = 'need to blank'
-			out += [ '.....\n',
-				 'You need to blank RW-media.\n',
-				 'Try to add -z to the options list.\n',
-				 'CAUTION: previous information on disk will be lost\n'	]
-		else:	err_str = 'not writable'
+		#if 'RW' in media:
+		#	err_str = 'need to blank'
+		#	out += [ '.....\n',
+		#		 'You need to blank RW-media. Add -z to the options list.\n',
+		#		 'CAUTION: any previous information on disk will be lost\n'	]
+		#else:	err_str = 'not writable'
+		err_str = 'not writable'
 		print_error( err_str )
 		exit_flag = True
 
@@ -669,8 +668,8 @@ def check_new_session():	#{{{
 	flush()
 
 	mkisofs_base = \
-		'mkisofs -r -J -l -D -joliet-long -allow-leading-dots -allow-lowercase \
-		-allow-multidot -graft-points -v'
+		'mkisofs -r -J -l -D -joliet-long -allow-leading-dots -allow-lowercase' \
+		' -allow-multidot -graft-points -v'
 	if charset != None:
 		mkisofs_base += ' -input-charset %s' % ( charset )
 
@@ -680,7 +679,7 @@ def check_new_session():	#{{{
 	mkisofs_base = filter_opts( mkisofs_base, mkisofs_valid_opts )
 	
 	mkisofs_print = mkisofs_base + ' -print-size %s 2>&1' % fnames
-	mkisofs_cmd = mkisofs_base + ' %s 2>/dev/null' % fnames
+	mkisofs_cmd = mkisofs_base + ' %s' % fnames
 	
 	cmd = mkisofs_print
 	print_debug( cmd )
@@ -761,7 +760,7 @@ def burn_cd_disk():	#{{{
 		%s -force -v %s -waiti tsize=%lus -immed -eject -' % \
 		( device, speed_addon, write_mode, new_size ), cdrecord_valid_opts )
 	
-	cmd = mkisofs_cmd+' | '+cdrecord_cmd+' 2>&1'
+	cmd = mkisofs_cmd+' 2>/dev/null | '+cdrecord_cmd+' 2>&1'
 	print_debug( cmd )
 	ch_out = os.popen( cmd )
 	out = []
@@ -855,15 +854,14 @@ def burn_cd_disk():	#{{{
 	sys.exit(1)
 #}}}
 def burn_dvd_disk():	#{{{
-	global	single_session, raw_mode, speed, new_size, cdrecord_valid_opts, \
-		device, mkisofs_cmd
+	global	speed, device, mkisofs_cmd, blank
 
 	write( COLOR_3+'*'+COLOR_0 )
 	s = ' Burning... '
 	write( '%s%s' % (COLOR_1,s) )
 	flush()
 
-	if single_session:
+	if blank:
 		if raw_mode:
 			write_mode = ' -raw -overburn'
 		else:	write_mode = ' -dao -overburn'
