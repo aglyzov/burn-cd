@@ -6,20 +6,20 @@
 Последнее изменение:	26 ноября 2006
 
 """
-import sys, os, stat, getopt, string
+import sys, os, stat, getopt, string, time
 
 # Глобальные переменные {{{
 PROG = "burn-cd"
 
 VERSION = \
 	"%s version 1.5a\n" \
-	"Written by SmART, 2004-2006" % PROG
+	"Written by SmART, 2004-2006\n" % PROG
 
-USAGE = "Usage:  %s [options] <file_or_dir_to_burn> [...]" % PROG
+USAGE = "Usage:  %s [options] <file_or_dir_to_burn> [...]\n" % PROG
 
 DESCRIPTION = \
 	"This is handy frontend for cdrtools/cdrkit and dvd+rw-tools\n" \
-	"for easy burning of single & multi session CD/DVD disks."
+	"for easy burning of single & multi session CD/DVD disks.\n"
 
 HELP = \
 """Options:
@@ -128,12 +128,15 @@ info		= False
 debug		= False
 media		= None
 blank		= False
+single_session	= False
 dvd 		= False
+free_space	= None
+total_space	= None
 last_start	= None
 new_start	= None
+new_size	= None
 raw_mode	= None
-mkisofs_base	= None
-mkisofs_cmd	= None
+mkisofs_opts	= None
 
 mkisofs_out	= None
 cdrecord_out	= None
@@ -148,23 +151,22 @@ def no_color():	#{{{1
 	COLOR_0 = COLOR_1 = COLOR_2 = COLOR_3 = COLOR_4 = \
 	COLOR_5 = COLOR_6 = COLOR_7 = COLOR_8 = COLOR_9 = ''
 #}}}1
-def escape_str( str ):	#{{{1
-	#str = str.replace( "\\", "\\\\" )
-	str = str.replace( "\"", "\\\"" )
-	str = str.replace( "\'", "\\\'" )
-	str = str.replace( " ", "\\ " )
-	str = str.replace( "=", "\\=" )
-	str = str.replace( "(", "\\(" )
-	str = str.replace( ")", "\\)" )
-	str = str.replace( "[", "\\[" )
-	str = str.replace( "]", "\\]" )
-	str = str.replace( ";", "\\;" )
-	str = str.replace( "&", "\\&" )
-	str = str.replace( "|", "\\|" )
-	str = str.replace( "\011", "\\\011" )
-	str = str.replace( "\012", "\\\012" )
-	str = str.replace( "\015", "\\\015" )
-	return str
+def escape_str( s ):	#{{{1
+	s = s.replace( "\"", "\\\"" )
+	s = s.replace( "\'", "\\\'" )
+	s = s.replace( " ", "\\ " )
+	s = s.replace( "=", "\\=" )
+	s = s.replace( "(", "\\(" )
+	s = s.replace( ")", "\\)" )
+	s = s.replace( "[", "\\[" )
+	s = s.replace( "]", "\\]" )
+	s = s.replace( ";", "\\;" )
+	s = s.replace( "&", "\\&" )
+	s = s.replace( "|", "\\|" )
+	s = s.replace( "\011", "\\\011" )
+	s = s.replace( "\012", "\\\012" )
+	s = s.replace( "\015", "\\\015" )
+	return s
 #}}}1
 def filter_opts( cmd, valid_opts ):	#{{{
 	global debug
@@ -323,7 +325,7 @@ def check_programs():	#{{{
 	flush()
 	isoinfo_out, isoinfo_exit_code = run_cmd( cmd )
 	
-	cmd = 'growisofs --version 2>/dev/null | head -n1'
+	cmd = 'growisofs -version 2>/dev/null | head -n1'
 	print_debug( cmd )
 	flush()
 	growisofs_out, growisofs_exit_code = run_cmd( cmd )
@@ -335,38 +337,41 @@ def check_programs():	#{{{
 		print_error('not found')
 		exit_flag = True
 	
+	# mkisofs
+	val_str = None
+	if mkisofs_exit_code == None:
+		mkisofs_ver = mkisofs_out[0].split(' ',2)[1]
+		val_str = mkisofs_ver.split(',',1)[0]
 	if verbose:
-		# mkisofs
-		val_str = None
-		if mkisofs_exit_code == None:
-			mkisofs_ver = mkisofs_out[0].split(' ',2)[1]
-			val_str = mkisofs_ver.split(',',1)[0]
 		print_version( 'mkisofs', val_str )
-		
-		# cdrecord
-		val_str = None
-		if cdrecord_exit_code == None:
-			val_str = cdrecord_out[0].split(' ',2)[1]
-		print_version( 'cdrecord', val_str )
-		
-		# isoinfo
-		val_str = None
-		if isoinfo_exit_code == None:
-			val_str = isoinfo_out[0].split(' ',2)[1]
-			isoinfo = True
-		print_version( 'isoinfo', val_str )
-		
-		# growisofs
-		val_str = None
-		if growisofs_exit_code == None:
-			try:
-				val_str = growisofs_out[0].split(' ',5)[5]
-				val_str = val_str.split(',',1)[0]
-				growisofs = True
-			except:	pass
-		print_version( 'growisofs', val_str )
 	
-		flush()
+	# cdrecord
+	val_str = None
+	if cdrecord_exit_code == None:
+		val_str = cdrecord_out[0].split(' ',2)[1]
+	if verbose:
+		print_version( 'cdrecord', val_str )
+	
+	# isoinfo
+	val_str = None
+	if isoinfo_exit_code == None:
+		val_str = isoinfo_out[0].split(' ',2)[1]
+		isoinfo = True
+	if verbose:
+		print_version( 'isoinfo', val_str )
+	
+	# growisofs
+	val_str = None
+	if growisofs_exit_code == None:
+		try:
+			val_str = growisofs_out[0].split(' ',5)[5]
+			val_str = val_str.split(',',1)[0]
+			growisofs = True
+		except:	pass
+	if verbose:
+		print_version( 'growisofs', val_str )
+
+	flush()
 		
 	if not exit_flag:  return
 
@@ -406,6 +411,7 @@ def check_disk_in_drive():	#{{{
 	else:
 		print_error( error_str )
 		exit_flag = True
+	flush()
 	
 	if verbose:
 		print_key_value( 'Device', device )
@@ -440,11 +446,15 @@ def check_disk_in_drive():	#{{{
 	sys.exit(1)
 #}}}
 def check_cd_disk():	#{{{
-	global media, device, cdrecord_valid_opts, verbose, last_start, new_start, blank
+	global	media, device, cdrecord_valid_opts, verbose, last_start, \
+		new_start, blank, free_space, total_space
 
 	print_task( 'Checking disk type...' )
 
-	cmd = filter_opts( 'cdrecord dev=%s -msinfo -silent -v 2>&1' % device, cdrecord_valid_opts )
+	cmd = filter_opts(
+		'cdrecord dev=%s -msinfo -silent -v 2>&1' % device,
+		cdrecord_valid_opts
+	)
 	print_debug( cmd )
 	flush()
 	out, exit_code = run_cmd( cmd )
@@ -486,6 +496,7 @@ def check_cd_disk():	#{{{
 		else:	err_str = 'not writable'
 		print_error( err_str )
 		exit_flag = True
+	flush()
 
 	if blank:
 		free_space = total_space
@@ -520,11 +531,14 @@ def check_cd_disk():	#{{{
 #}}}
 def check_dvd_disk():	#{{{
 	global	media, device, cdrecord_valid_opts, disk_capacities, verbose, \
-		zero, blank
+		zero, blank, isoinfo, free_space, total_space
 
 	print_task( 'Checking disk type...' )
 
-	cmd = filter_opts( 'cdrecord dev=%s -atip -silent -v 2>&1' % device, cdrecord_valid_opts )
+	cmd = filter_opts(
+		'cdrecord dev=%s -atip -silent -v 2>&1' % device,
+		cdrecord_valid_opts
+	)
 	print_debug( cmd )
 	flush()
 	out, exit_code = run_cmd( cmd )
@@ -573,6 +587,7 @@ def check_dvd_disk():	#{{{
 		err_str = 'not writable'
 		print_error( err_str )
 		exit_flag = True
+	flush()
 
 	if blank:
 		free_space = total_space
@@ -581,7 +596,9 @@ def check_dvd_disk():	#{{{
 		cmd = 'isoinfo -d dev=%s 2>&1' % device
 		print_debug( cmd )
 		flush()
-		out, exit_code = run_cmd( cmd )
+		if isoinfo:
+			out, exit_code = run_cmd( cmd )
+		else:	out = []
 		used_space = 0
 		for s in out:
 			if not 'Volume size is:' in s:  continue
@@ -631,10 +648,10 @@ def build_file_list():	#{{{
 		f = escape_str( f )
 		basename = os_basename( f )
 		ok = False
-		dir = False
+		dir_flag = False
 		if S_ISDIR( mode ):
 			prefix = root + '/' + basename + '/='
-			dir = True
+			dir_flag = True
 			ok = True
 		elif S_ISREG( mode ) or S_ISLNK( mode ):
 			prefix = root + '/='
@@ -643,7 +660,7 @@ def build_file_list():	#{{{
 			print_debug( 'Not a file, link or dir. Skipped:  %s' % f )
 			
 		if ok:
-			if root == '' and not dir:  prefix = ''
+			if root == '' and not dir_flag:  prefix = ''
 			fnames.append( prefix + f )
 	flush()
 	
@@ -661,15 +678,13 @@ def blank_cdrw():	#{{{
 #}}}
 def check_new_session():	#{{{
 	global	verbose, charset, last_start, new_start, device, \
-		mkisofs_valid_opts, free_space, zero, mkisofs_base, \
-		mkisofs_cmd, raw_mode, single_session
+		mkisofs_valid_opts, free_space, zero, \
+		mkisofs_opts, raw_mode, single_session, new_size
 
 	print_task( 'Calculating new session size...' )
 	flush()
 
-	mkisofs_base = \
-		'mkisofs -r -J -l -D -joliet-long -allow-leading-dots -allow-lowercase' \
-		' -allow-multidot -graft-points -v'
+	mkisofs_base = '-r -J -joliet-long -D -U -graft-points -f'
 	if charset != None:
 		mkisofs_base += ' -input-charset %s' % ( charset )
 
@@ -678,26 +693,29 @@ def check_new_session():	#{{{
 	
 	mkisofs_base = filter_opts( mkisofs_base, mkisofs_valid_opts )
 	
-	mkisofs_print = mkisofs_base + ' -print-size %s 2>&1' % fnames
-	mkisofs_cmd = mkisofs_base + ' %s' % fnames
-	
+	mkisofs_opts = '%s %s' % (mkisofs_base, fnames)
+	mkisofs_print = 'mkisofs %s -print-size %s 2>&1' % (mkisofs_base, fnames)
+
 	cmd = mkisofs_print
 	print_debug( cmd )
 	flush()
 	
 	ch_out, exit_code = run_cmd( cmd )
 
-	mode_str = 'multi session'
 	raw_mode = False
 	single_session = False
-	if blank:	multi_overhead = 11702
-	else:		multi_overhead = 6902
+	if blank:
+		multi_overhead = 11702
+		mode_str = 'start multi-session'
+	else:
+		mode_str = 'continue multi-session'
+		multi_overhead = 6902
 
 	if exit_code != None:
 		print_error( 'something wrong' )
 		exit_flag = True
 	else:
-		try:	new_size = long( out[-1] )
+		try:	new_size = long( ch_out[-1] )
 		except:	new_size = 0
 		
 		delta_size = free_space - new_size
@@ -724,26 +742,24 @@ def check_new_session():	#{{{
 			print OK
 	
 	if verbose:
-		key_str = 'Session size:'
 		try:	sess_size = '%.1f MB (%.1f MB)' % ((new_size+multi_overhead)/512.0,new_size/512.0)
 		except:	sess_size = 'n/a'
 		print_key_value( 'Session size', sess_size )
 		print_key_value( 'Burning mode', mode_str )
+	flush()
 			
 	if not exit_flag:  return
 
 	if verbose:
-		print_prog_out( out )
+		print_prog_out( ch_out )
 		flush()
 	sys.exit(1)
 #}}}
 def burn_cd_disk():	#{{{
 	global	single_session, raw_mode, speed, new_size, cdrecord_valid_opts, \
-		device, mkisofs_cmd
+		device, mkisofs_opts
 
-	write( COLOR_3+'*'+COLOR_0 )
-	s = ' Burning... '
-	write( '%s%s' % (COLOR_1,s) )
+	write( '%s*%s %sBurning... ' % (COLOR_3, COLOR_0, COLOR_1) )
 	flush()
 
 	if single_session:
@@ -758,9 +774,9 @@ def burn_cd_disk():	#{{{
 	cdrecord_cmd = filter_opts( \
 		'cdrecord dev=%s driveropts=burnfree fs=24m gracetime=3 \
 		%s -force -v %s -waiti tsize=%lus -immed -eject -' % \
-		( device, speed_addon, write_mode, new_size ), cdrecord_valid_opts )
+		(device, speed_addon, write_mode, new_size), cdrecord_valid_opts )
 	
-	cmd = mkisofs_cmd+' 2>/dev/null | '+cdrecord_cmd+' 2>&1'
+	cmd = 'mkisofs %s 2>/dev/null | %s 2>&1' % (mkisofs_opts, cdrecord_cmd) 
 	print_debug( cmd )
 	ch_out = os.popen( cmd )
 	out = []
@@ -840,11 +856,11 @@ def burn_cd_disk():	#{{{
 	if exit_code == None:
 		print OK
 		exit_flag = False
+		if verbose:  print_key_value( 'Fixating time', fixating_time )
 	else:
 		print_error( 'error' )
 		exit_flag = True
-	
-	if verbose:  print_key_value( 'Fixating time', fixating_time )
+	flush()
 			
 	if not exit_flag:  return
 
@@ -854,113 +870,90 @@ def burn_cd_disk():	#{{{
 	sys.exit(1)
 #}}}
 def burn_dvd_disk():	#{{{
-	global	speed, device, mkisofs_cmd, blank
+	global	speed, device, mkisofs_opts, blank, growisofs, new_size
 
-	write( COLOR_3+'*'+COLOR_0 )
-	s = ' Burning... '
-	write( '%s%s' % (COLOR_1,s) )
+	write( '%s*%s %sBurning... ' % (COLOR_3, COLOR_0, COLOR_1) )
 	flush()
 
-	if blank:
-		if raw_mode:
-			write_mode = ' -raw -overburn'
-		else:	write_mode = ' -dao -overburn'
-	else:
-		write_mode = ' -tao -multi'
+	if not growisofs:
+		print_error('no growisofs')
+		if verbose:
+			out = ['Program growisofs not found']
+			print_prog_out( out )
+			flush()
+		sys.exit(1)
 
-	if speed:  speed_addon = ' speed=%d' % speed
-	else:	   speed_addon = ''
-	cdrecord_cmd = filter_opts( \
-		'cdrecord dev=%s driveropts=burnfree fs=24m gracetime=3 \
-		%s -force -v %s -waiti tsize=%lus -immed -eject -' % \
-		( device, speed_addon, write_mode, new_size ), cdrecord_valid_opts )
-	
-	cmd = mkisofs_cmd+' | '+cdrecord_cmd+' 2>&1'
+	base = 'growisofs -use-the-force-luke=tty'
+	if speed:  base += ' -speed=%u' % speed
+	if blank:
+		base += ' -Z %s' % device
+	else:	base += ' -M %s' % device
+		
+	cmd = '%s %s 2>&1' % ( base, mkisofs_opts )
 	print_debug( cmd )
+
+	b_num = 0
+	for c in ('3','2','1'):
+		write( '\b'*b_num+'(starts in '+COLOR_5+c+COLOR_0+COLOR_1+' seconds)' )
+		flush()
+		b_num = 21 
+		time.sleep(1)
+	write( '\b'*b_num+' '*b_num+'\n' )
+	update_progress_bar( 0, 2 )
+
 	ch_out = os.popen( cmd )
 	out = []
+	avg_speed = None
+	writing_start = time.time()
+	leadout_start = None
 	while True:
-		s = ch_out.readline( 200 )
+		s = ch_out.readline(200)
 		if s == '':  break
 		out.append( s )
-		if 'Starting to write' in s:  break
-	b_num = 0
-	s = ''
-	while True:
-		c = ch_out.read(1)
-		if c == '':  break
-		s += c
-		if c == '.':
-			if 'Operation starts.' in s:
-				write( '\b'*25 + '...' + ' '*22 + '\n' )
-				flush()
-				update_progress_bar( 0, 2 )
-				out.append( s+'\n' )
-				break
-			elif ' seconds.' in s:
-				sec = s.split()[-2]
-				write( '\b'*b_num+'(starts in '+COLOR_5+sec+COLOR_0+COLOR_1+' seconds)' )
-				flush()
-				b_num = 21
-				out.append( s+'\n' )
-		elif c in '\b\n':
-			if len(s) > 1:
-				out.append( s[:-1] + '\n' )
-			s = ''
-	
-	avg_speed = 'n/a'
-	writing_time = 'n/a'
-	fixating_time = 'n/a'
-	fixating_flag = False
-	s = ''
-	while True:
-		c = ch_out.read(1)
-		if c == '':  break
-		s += c
-		if c == '\n':
-			if 'Fixating...' in s:
-				write( '\n' )
-				if verbose:
-					print_key_value( 'Average speed', avg_speed )
-					print_key_value( 'Writing time', writing_time )
-				fixating_flag = True
-				print_task( 'Fixating...' )
-				flush()
-			elif 'Total bytes read/written:' in s:
-				update_progress_bar( 100, 2 )
-			elif 'Average write speed' in s:
-				try:	avg_speed = s.split()[-1].strip()[:-1]
-				except:	pass
-			elif 'time:' in s:
-				try:
-					tmp_time = s.split()[-1].strip()
-					if fixating_flag:
-						fixating_time = tmp_time
-					else:	writing_time = tmp_time
-				except:	pass
-			out.append( s )
-			s = ''
-		elif c == '.':
-			if (' written ' in s) and ('x.' in s):
-				pieces = s.split( None, 5 )
-				total = float( pieces[4] )
-				written = float( pieces[2] )
-				update_progress_bar( written*100/total, 2 )
-				out.append( s + '\n' )
-				s = ''
-		elif c == '\r':
-			s = ''
+		if '% done,' in s:
+			try:	p = float( s.split('%',1)[0] )
+			except:	pass
+			update_progress_bar( p, 2 )
+		if 'writing lead-out' in s:
+			print_task( 'Writing lead-out...' )
+			flush()
+			leadout_start = time.time()
+		elif 'extents written' in s:
+			update_progress_bar( 100, 2 )
+			write( '\n' )
+			if verbose:
+				t = time.time()-writing_start
+				speed = new_size*2 / t
+				coef = speed / 1352
+				avg_speed = '%.1fx (%.1f MB/s)' % ( coef, speed/1024 )
+				print_key_value( 'Average speed', avg_speed )
+				writing_time = '%d sec' % round( t )
+				print_key_value( 'Writing time', writing_time )
+			flush()
+		#elif 'out @ average' in s:
+		#	try:
+		#		last_item = s.split()[-1]
+		#		coef = float( last_item.split('x',1)[0] )
+		#		speed = coef * 1352 / 1024
+		#	except:	avg_speed = 'FAST :)'
 	exit_code = ch_out.close()
 	
 	if exit_code == None:
 		print OK
 		exit_flag = False
+		if verbose:
+			leadout_time = '%d sec' % round( time.time()-leadout_start )
+			print_key_value( 'Lead-out time', leadout_time or 'n/a' )
+		flush()
+		ej_out, ej_excode = run_cmd( 'cdrecord dev=%s -eject 2>/dev/null' % device )
 	else:
 		print_error( 'error' )
 		exit_flag = True
-	
-	if verbose:  print_key_value( 'Fixating time', fixating_time )
+	flush()
 			
+	# DEBUG
+	#for s in out:
+	#	print( s[:-1] )
 	if not exit_flag:  return
 
 	if verbose:
