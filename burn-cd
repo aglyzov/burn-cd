@@ -6,13 +6,13 @@
 Последнее изменение:	27 ноября 2006
 
 """
-import sys, os, stat, getopt, string, time
+import sys, os, stat, getopt, string, time, signal
 
 # Глобальные переменные {{{
 PROG = "burn-cd"
 
 VERSION = \
-	"%s version 1.5-alpha3\n" \
+	"%s version 1.5-alpha4\n" \
 	"Written by SmART, 2004-2006\n" % PROG
 
 USAGE = "Usage:  %s [options] <file_or_dir_to_burn> [...]\n" % PROG
@@ -151,6 +151,16 @@ last_time	= None
 one_speed	= 150.0
 #}}}
 
+def handle_signal( signum, frame ):	#{{{
+	dummy = frame  # disable pychecker warning
+	if signum == signal.SIGINT:
+		name = 'SIGINT (Ctrl-C)'
+	else:	name = 'SIGTERM'
+	print '%s[%ssignal%s]\n%sGot signal %s, terminating...%s' % \
+		(COLOR_5, COLOR_8, COLOR_5, COLOR_4, name, COLOR_0)
+	sys.exit(10)
+#}}}
+
 def no_color():	#{{{1
 	global	COLOR_0, COLOR_1, COLOR_2, COLOR_3, COLOR_4, \
 		COLOR_5, COLOR_6, COLOR_7, COLOR_8, COLOR_9
@@ -246,7 +256,7 @@ def print_prog_out( out ):	#{{{
 def update_progress_bar( percent, first_pad=0 ):	#{{{
 	global new_size, last_progress, last_time, one_speed
 
-	bar_len = 38
+	bar_len = 39
 	write( '\r%s%s[' % (' '*first_pad,COLOR_9) )
 	eq_len = int( percent*(bar_len-2) / 100.0 )
 	sp_len = bar_len - 2 - eq_len
@@ -267,10 +277,13 @@ def update_progress_bar( percent, first_pad=0 ):	#{{{
 		coef = spd * 1024.0 / one_speed
 	else:
 		spd = coef = 0.0
-	write(
-		' %s%.1fx %s(%s%.1f MB/s%s)' % \
-		(COLOR_5, coef, COLOR_1, COLOR_5, spd, COLOR_1)
-	)
+	if spd >= 100 or coef >= 100:
+		s = ' %s--.-%sx %s--.-%sMB/s%s' % \
+		(COLOR_0+COLOR_1, COLOR_6, COLOR_0+COLOR_1, COLOR_6, COLOR_0)
+	else:
+		s = ' %s%4.1f%sx %s%4.1f%sMB/s%s' % \
+		(COLOR_0+COLOR_1, coef, COLOR_6, COLOR_0+COLOR_1, spd, COLOR_6, COLOR_0)
+	write( s )
 	last_time = t
 	last_progress = percent
 
@@ -514,6 +527,10 @@ def check_cd_disk():	#{{{
 			try:	max_speed = int( s.split()[-1].strip() )
 			except:	pass
 		
+	if zero and 'RW' in media:
+		blank = True
+		appendable = True
+
 	if appendable:
 		print OK
 		exit_flag = False
@@ -698,7 +715,7 @@ def build_file_list():	#{{{
 	flush()
 	
 	if len(fnames) == 0:
-		write( '%sNothing to write! Exiting.%s\n' % (COLOR_4,COLOR_0) )
+		write( '%sNothing to write, exiting...%s\n' % (COLOR_4,COLOR_0) )
 		sys.exit(3)
 	
 	fnames = string.join( fnames )
@@ -779,7 +796,7 @@ def check_new_session():	#{{{
 	print_task( 'Calculating new session size...' )
 	flush()
 
-	mkisofs_base = '-r -J -joliet-long -D -U -graft-points -f -gui'
+	mkisofs_base = '-r -J -joliet-long -D -U -graft-points -f'
 	if charset != None:
 		mkisofs_base += ' -input-charset %s' % ( charset )
 
@@ -1032,12 +1049,6 @@ def burn_dvd_disk():	#{{{
 				writing_time = '%d sec' % round( t )
 				print_key_value( 'Writing time', writing_time )
 			flush()
-		#elif 'out @ average' in s:
-		#	try:
-		#		last_item = s.split()[-1]
-		#		coef = float( last_item.split('x',1)[0] )
-		#		speed = coef * 1352 / 1024
-		#	except:	avg_speed = 'FAST :)'
 	exit_code = ch_out.close()
 	
 	if exit_code == None:
@@ -1054,8 +1065,9 @@ def burn_dvd_disk():	#{{{
 	flush()
 			
 	# DEBUG
-	for s in out:
-		print( s[:-1] )
+	#for s in out:
+	#	print( s[:-1] )
+
 	if not exit_flag:  return
 
 	if verbose:
@@ -1065,6 +1077,9 @@ def burn_dvd_disk():	#{{{
 #}}}
 
 if __name__ == "__main__":	#{{{
+	signal.signal( signal.SIGINT, handle_signal )
+	signal.signal( signal.SIGTERM, handle_signal )
+
 	# если stdout - не терминал, выключаем цвет
 	if not sys.stdout.isatty():  no_color()
 
