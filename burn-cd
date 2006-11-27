@@ -142,6 +142,9 @@ mkisofs_out	= None
 cdrecord_out	= None
 isoinfo		= False
 growisofs	= False
+
+last_progress	= None
+last_time	= None
 #}}}
 
 def no_color():	#{{{1
@@ -237,7 +240,9 @@ def print_prog_out( out ):	#{{{
 	write( COLOR_0 )
 #}}}
 def update_progress_bar( percent, first_pad=0 ):	#{{{
-	bar_len = 54
+	global new_size, last_progress, last_time
+
+	bar_len = 38
 	write( '\r%s%s[' % (' '*first_pad,COLOR_9) )
 	eq_len = int( percent*(bar_len-2) / 100.0 )
 	sp_len = bar_len - 2 - eq_len
@@ -246,6 +251,19 @@ def update_progress_bar( percent, first_pad=0 ):	#{{{
 		write( COLOR_8+ '\b*' )
 	write( ' '*sp_len )
 	write( COLOR_9+']' )
+
+	# show current speed
+	t = time.time()
+	if last_progress:
+		delta_p = percent - last_progress
+		delta_t = t - last_time
+		data = new_size * delta_p / 51200.0
+		speed = data / delta_t
+		coef = speed * 1024.0 / 1352.0
+		write( ' %s%.1fx (%.1f MB/s)' % (COLOR_1, coef, speed) )
+	last_time = t
+	last_progress = percent
+
 	flush()
 #}}}
 
