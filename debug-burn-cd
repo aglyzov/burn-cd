@@ -1,0 +1,29 @@
+
+Waiting for reader process to fill input buffer ... cdrecord: Warning: controller returns wrong page 3 for Ricoh Vendor Page page (30).
+input buffer ready.
+BURN-Free is ON.
+Performing OPC...
+Sending CUE sheet...
+Writing pregap for track 1 at -150
+Starting new track at sector: 0
+Track 01:    1 of  434 MB written (fifo 100%) [buf 100%] |347  462ms|   0.4x.
+Track 01:    2 of  434 MB written (fifo 100%) [buf 100%] |347  448ms|  10.3x.
+Track 01:    3 of  434 MB written (fifo 100%) [buf 100%] |347  435ms|  10.6x.
+Track 01:    4 of  434 MB written (fifo 100%) [buf 100%] |347  449ms|  10.3x.
+Track 01:    5 of  434 MB written (fifo 100%) [buf 100%] |347  435ms|  10.6x.
+Track 01:    6 of  434 MB written (fifo 100%) [buf 100%] |347  450ms|  10.3x.
+Track 01:    7 of  434 MB written (fifo 100%) [buf 100%] |347  436ms|  10.6x.
+Track 01:    8 of  434 MB written (fifo 100%) [buf 100%] |347  451ms|  10.3x.
+Track 01:    9 of  434 MB written (fifo 100%) [buf 100%] |347  437ms|  10.6x.
+Track 01:   10 of  434 MB written (fifo 100%) [buf 100%] |347  452ms|  10.2x.
+Track 01:   11 of  434 MB written (fifo 100%) [buf 100%] |347  438ms|  10.6x.
+Track 01:   12 of  434 MB written (fifo 100%) [buf 100%] |347  452ms|  10.2x.
+Track 01:   13 of  434 MB written (fifo 100%) [buf 100%] |347  439ms|  10.5x.
+Track 01:   14 of  434 MB written (fifo 100%) [buf 100%] |347  453ms|  10.2x.
+Track 01:   15 of  434 MB written (fifo 100%) [buf 100%] |347  440ms|  10.5x.
+Track 01:   16 of  434 MB written (fifo 100%) [buf 100%] |347  454ms|  10.2x.
+Track 01:   17 of  434 MB written (fifo 100%) [buf 100%] |347  440ms|  10.5x.
+Track 01:   18 of  434 MB written (fifo 100%) [buf 100%] |347  455ms|  10.2x.
+Track 01:   19 of  434 MB written (fifo 100%) [buf 100%] |347  441ms|  10.5x.
+Track 01:   20 of  434 MB written (fifo 100%) [buf 100%] |347  456ms|  10.1x.
+Track 01:   21 of  434 MB written (fifo 100%) [buf 100%] |347  442ms|  10.5x.

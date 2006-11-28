@@ -3,7 +3,7 @@
 """
 Краткое описание:	удобная оболочка для cdrtools и dvd+rw-tools
 Автор:			SmART
-Последнее изменение:	27 ноября 2006
+Последнее изменение:	28 ноября 2006
 
 """
 import sys, os, stat, getopt, string, time, signal
@@ -12,7 +12,7 @@ import sys, os, stat, getopt, string, time, signal
 PROG = "burn-cd"
 
 VERSION = \
-	"%s version 1.5-alpha4\n" \
+	"%s version 1.5-alpha5\n" \
 	"Written by SmART, 2004-2006\n" % PROG
 
 USAGE = "Usage:  %s [options] <file_or_dir_to_burn> [...]\n" % PROG
@@ -27,7 +27,9 @@ HELP = \
    -d<DEV>,  --device=<DEV>   CD-RW device (defaults to '/dev/hdc')
    -s<N>,    --speed=<N>      tell cdrecord to burn CD on specific speed
    -c<XYZ>,  --charset=<XYZ>  charset of the filenames (defaults to LOCALE)
+   -m<FILE>, --image=<FILE>   burn FILE as a disk image (ex. iso, bin, ...)
    -z,       --zero           blank RW-media before burning (if needed)
+   --nero                     try to continue rotten multisession recording
    
    -i, --info		      show drive/media info and exit
    -n, --no-color	      disable colors
@@ -126,6 +128,9 @@ zero	  	= False
 verbose		= False
 info		= False
 debug		= False
+image		= None
+nero		= False
+
 media		= None
 blank		= False
 single_session	= False
@@ -137,6 +142,7 @@ new_start	= None
 new_size	= None
 raw_mode	= None
 mkisofs_opts	= None
+burning_now	= False
 
 mkisofs_out	= None
 cdrecord_out	= None
@@ -152,6 +158,9 @@ one_speed	= 150.0
 #}}}
 
 def handle_signal( signum, frame ):	#{{{
+	global burning_now
+	
+	if burning_now:  return
 	dummy = frame  # disable pychecker warning
 	if signum == signal.SIGINT:
 		name = 'SIGINT (Ctrl-C)'
@@ -163,10 +172,13 @@ def handle_signal( signum, frame ):	#{{{
 
 def no_color():	#{{{1
 	global	COLOR_0, COLOR_1, COLOR_2, COLOR_3, COLOR_4, \
-		COLOR_5, COLOR_6, COLOR_7, COLOR_8, COLOR_9
+		COLOR_5, COLOR_6, COLOR_7, COLOR_8, COLOR_9, \
+		ASTERISK, OK
 	
 	COLOR_0 = COLOR_1 = COLOR_2 = COLOR_3 = COLOR_4 = \
 	COLOR_5 = COLOR_6 = COLOR_7 = COLOR_8 = COLOR_9 = ''
+	ASTERISK = '*'
+	OK = '[ok]'
 #}}}1
 def escape_str( s ):	#{{{1
 	s = s.replace( "\"", "\\\"" )
@@ -229,7 +241,8 @@ def print_task( s ):	#{{{
 def print_error( s ):	#{{{
 	print COLOR_5+'['+COLOR_8+ s +COLOR_5+']'+COLOR_0
 #}}}
-def print_key_value( key, val, val_color=COLOR_2 ):	#{{{
+def print_key_value( key, val, val_color=None ):	#{{{
+	if not val_color:  val_color = COLOR_2
 	key_str = '%s:' % key
 	write(
 		'  %s%-16s%s%s%s\n' % \
@@ -253,12 +266,12 @@ def print_prog_out( out ):	#{{{
 	for s in out:  write( '  ' + s )
 	write( COLOR_0 )
 #}}}
-def update_progress_bar( percent, first_pad=0 ):	#{{{
+def update_progress_bar( percent, first_pad=0, preformat=False ):	#{{{
 	global new_size, last_progress, last_time, one_speed
 
 	bar_len = 39
 	write( '\r%s%s[' % (' '*first_pad,COLOR_9) )
-	eq_len = int( percent*(bar_len-2) / 100.0 )
+	eq_len = long( round( percent*(bar_len-2) / 100.0 ) )
 	sp_len = bar_len - 2 - eq_len
 	write( COLOR_5+ '='*eq_len )
 	if 0 < eq_len < bar_len-2:
@@ -268,21 +281,24 @@ def update_progress_bar( percent, first_pad=0 ):	#{{{
 
 	# show current speed
 	t = time.time()
-	if last_progress:
-		delta_p = percent - last_progress
-		delta_t = t - last_time
-		data = new_size * delta_p / 51200.0
-		try:	spd = data / delta_t
-		except:	spd = one_speed
-		coef = spd * 1024.0 / one_speed
+	if preformat:
+		s = ' %spre-formatting%s' % (COLOR_0+COLOR_1, COLOR_0)
 	else:
-		spd = coef = 0.0
-	if spd >= 100 or coef >= 100:
-		s = ' %s--.-%sx %s--.-%sMB/s%s' % \
-		(COLOR_0+COLOR_1, COLOR_6, COLOR_0+COLOR_1, COLOR_6, COLOR_0)
-	else:
-		s = ' %s%4.1f%sx %s%4.1f%sMB/s%s' % \
-		(COLOR_0+COLOR_1, coef, COLOR_6, COLOR_0+COLOR_1, spd, COLOR_6, COLOR_0)
+		if last_progress:
+			delta_p = percent - last_progress
+			delta_t = t - last_time
+			data = new_size * delta_p / 51200.0
+			try:	spd = data / delta_t
+			except:	spd = one_speed
+			coef = spd * 1024.0 / one_speed
+		else:
+			spd = coef = 1000.0
+		if spd >= 100 or coef >= 100:
+			s = ' %s--.-%sx %s--.-%sMB/s%s' % \
+			(COLOR_0+COLOR_1, COLOR_6, COLOR_0+COLOR_1, COLOR_6, COLOR_0)
+		else:
+			s = ' %s%4.1f%sx %s%4.1f%sMB/s%s' % \
+			(COLOR_0+COLOR_1, coef, COLOR_6, COLOR_0+COLOR_1, spd, COLOR_6, COLOR_0)
 	write( s )
 	last_time = t
 	last_progress = percent
@@ -291,15 +307,15 @@ def update_progress_bar( percent, first_pad=0 ):	#{{{
 #}}}
 
 def parse_cmd_line():	#{{{
-	global	root, lang, charset, device, speed, zero, \
-		verbose, info, debug, media, dvd, filenames
+	global	root, lang, charset, device, speed, zero, nero, \
+		verbose, info, debug, media, dvd, filenames, image
 
 	opts, filenames = [], []
 	try:	opts, filenames = getopt.getopt(
-			sys.argv[1:], 'vnr:d:hc:is:z',
+			sys.argv[1:], 'vnr:d:hc:is:zm:',
 			[ 'help', 'verbose', 'no-color', 'root=', 'device=',
 			  'speed=', 'charset=', 'version', 'info', 'debug',
-			  'zero' ]
+			  'zero', 'nero', 'image=' ]
 		)
 	except getopt.GetoptError:
 		print USAGE
@@ -331,13 +347,17 @@ def parse_cmd_line():	#{{{
 			except:	pass
 		elif opt in ['-z','--zero']:
 			zero = True
+		elif opt in ['--nero']:
+			nero = True
+		elif opt in ['-m','--image']:
+			image = val
 		elif opt in ['-c','--charset']:
 			charset = val
 		elif opt in ['-i','--info']:
 			info = True
 			verbose = True
 	
-	if len(filenames) == 0 and not (info or zero):
+	if not filenames and not (info or zero or image):
 		print USAGE
 		print DESCRIPTION
 		print HELP
@@ -490,12 +510,16 @@ def check_disk_in_drive():	#{{{
 #}}}
 def check_cd_disk():	#{{{
 	global	media, device, cdrecord_valid_opts, verbose, last_start, \
-		new_start, blank, free_space, total_space
+		new_start, blank, free_space, total_space, zero
 
 	print_task( 'Checking disk type...' )
 
+	if zero and 'RW' in media:
+		op = '-atip'
+	else:	op = '-msinfo'
+
 	cmd = filter_opts(
-		'cdrecord dev=%s -msinfo -silent -v 2>&1' % device,
+		'cdrecord dev=%s %s -v 2>&1' % (device, op),
 		cdrecord_valid_opts
 	)
 	print_debug( cmd )
@@ -532,15 +556,20 @@ def check_cd_disk():	#{{{
 		appendable = True
 
 	if appendable:
-		print OK
-		exit_flag = False
+		if zero and not blank:
+			print_error('non blankable')
+			out += [ '.....\n', 'CD-R media can not be blanked.\n' ]
+			exit_flag = True
+		else:
+			print OK
+			exit_flag = False
 	else:
 		if 'RW' in media:
-			err_str = 'need to blank'
+			err_str = 'not blank'
 			out += [ '.....\n',
 				 'You need to blank RW-media. Add -z to the options list.\n',
 				 'CAUTION: any previous information on disk will be lost\n' ]
-		else:	err_str = 'not writable'
+		else:	err_str = 'non writable'
 		print_error( err_str )
 		exit_flag = True
 	flush()
@@ -623,8 +652,13 @@ def check_dvd_disk():	#{{{
 		appendable = True
 		
 	if appendable:
-		print OK
-		exit_flag = False
+		if zero and not blank:
+			print_error('non blankable')
+			out += [ '.....\n', 'DVD+/-R media can not be blanked.\n' ]
+			exit_flag = True
+		else:
+			print OK
+			exit_flag = False
 	else:
 		#if 'RW' in media:
 		#	err_str = 'need to blank'
@@ -632,7 +666,7 @@ def check_dvd_disk():	#{{{
 		#		 'You need to blank RW-media. Add -z to the options list.\n',
 		#		 'CAUTION: any previous information on disk will be lost\n'	]
 		#else:	err_str = 'not writable'
-		err_str = 'not writable'
+		err_str = 'non writable'
 		print_error( err_str )
 		exit_flag = True
 	flush()
@@ -679,8 +713,11 @@ def check_dvd_disk():	#{{{
 	sys.exit(1)
 #}}}
 def build_file_list():	#{{{
-	global filenames, fnames, debug
+	global filenames, fnames, debug, image
 
+	os_stat = os.stat
+	os_abspath = os.path.abspath
+	os_expanduser = os.path.expanduser
 	os_basename = os.path.basename
 	S_ISDIR = stat.S_ISDIR
 	S_ISREG = stat.S_ISREG
@@ -689,8 +726,8 @@ def build_file_list():	#{{{
 
 	fnames = []
 	for f in filenames:
-		f = os.path.abspath( os.path.expanduser( f ) )
-		try:	f_stat = os.stat( f )
+		f = os_abspath( os_expanduser( f ) )
+		try:	f_stat = os_stat( f )
 		except:
 			print_debug( 'Not a file, link or dir. Skipped:  %s' % f )
 			continue
@@ -714,14 +751,19 @@ def build_file_list():	#{{{
 			fnames.append( prefix + f )
 	flush()
 	
-	if len(fnames) == 0:
+	if image and fnames:
+		write( '%sAmbiguous options: image and filenames simultaneously, exiting...%s\n' % \
+			(COLOR_4,COLOR_0) )
+		sys.exit(4)
+		
+	if not image and not fnames:
 		write( '%sNothing to write, exiting...%s\n' % (COLOR_4,COLOR_0) )
 		sys.exit(3)
 	
 	fnames = string.join( fnames )
 #}}}
 def blank_cdrw():	#{{{
-	global blank, device
+	global blank, device, burning_now
 	blank = True
 
 	write( '%s %sBlanking CD-RW... ' % (ASTERISK, COLOR_1) )
@@ -745,6 +787,7 @@ def blank_cdrw():	#{{{
 		s += c
 		if c == '.':
 			if 'Operation starts.' in s:
+				burning_now = True
 				write( '\b'*b_num + ' '*32 )
 				flush()
 				out.append( s+'\n' )
@@ -781,6 +824,7 @@ def blank_cdrw():	#{{{
 		exit_flag = True
 	flush()
 			
+	burning_now = False
 	if not exit_flag:  return
 
 	if verbose:
@@ -788,9 +832,70 @@ def blank_cdrw():	#{{{
 		flush()
 	sys.exit(1)
 #}}}
+def check_image_file():	#{{{
+	global	debug, image, new_size, blank, free_space, raw_mode, \
+		single_session, media, dvd
+
+	print_task( 'Checking image file...' )
+	flush()
+
+	f = os.path.abspath( os.path.expanduser( image ) )
+	try:	f_stat = os.stat( f )
+	except:
+		print_error('error')
+		write( '%s.....\nCan not find image file, terminating...%s\n' % \
+			(COLOR_8,COLOR_0) )
+		sys.exit(5)
+	mode = f_stat[ stat.ST_MODE ]
+	if stat.S_ISDIR( mode ):
+		print_error('error')
+		write( '%s.....\nImage is a directory, terminating...%s\n' % \
+			(COLOR_8,COLOR_0) )
+		sys.exit(5)
+	size = f_stat[ stat.ST_SIZE ]
+	new_size = long( size/2048.0 + 0.9999999 )
+	image = escape_str( f )
+
+	if not blank:
+		print_error('not blank')
+		if 'RW' in media:
+			out = [ 'You need to blank RW-media. Add -z to the options list.\n',
+				'CAUTION: any previous information on disk will be lost\n' ]
+		else:
+			out += [ 'This media is not blank, exiting...\n' ]
+		print_prog_out( out )
+		sys.exit(1)
+	
+	single_session = True
+	exit_flag = False
+	mode_str = 'single session (image)'
+	
+	if new_size > free_space:
+		if not dvd and new_size <= free_space + 6750:
+			raw_mode = True
+			mode_str += ', raw'
+		else:
+			too_big = True
+	else:	too_big = False
+
+	if too_big:
+		print_error( 'too big' )
+		exit_flag = True
+	else:
+		print OK
+
+	if verbose:
+		sess_size = '%.1f MB' % ( size / (1024.0*1024.0) )
+		print_key_value( 'Session size', sess_size )
+		print_key_value( 'Burning mode', mode_str )
+	flush()
+			
+	if not exit_flag:  return
+	sys.exit(6)
+#}}}
 def check_new_session():	#{{{
 	global	verbose, charset, last_start, new_start, device, \
-		mkisofs_valid_opts, free_space, zero, \
+		mkisofs_valid_opts, free_space, zero, nero, \
 		mkisofs_opts, raw_mode, single_session, new_size
 
 	print_task( 'Calculating new session size...' )
@@ -799,7 +904,8 @@ def check_new_session():	#{{{
 	mkisofs_base = '-r -J -joliet-long -D -U -graft-points -f'
 	if charset != None:
 		mkisofs_base += ' -input-charset %s' % ( charset )
-
+	if nero:
+		mkisofs_base += ' -no-rr'
 	if not blank and not dvd:
 		mkisofs_base += ' -C %lu,%lu -M %s' % ( last_start, new_start, device )
 	
@@ -869,28 +975,37 @@ def check_new_session():	#{{{
 #}}}
 def burn_cd_disk():	#{{{
 	global	single_session, raw_mode, speed, new_size, cdrecord_valid_opts, \
-		device, mkisofs_opts
+		device, mkisofs_opts, image, burning_now
 
 	write( '%s %sBurning... ' % (ASTERISK, COLOR_1) )
 	flush()
 
 	if single_session:
 		if raw_mode:
-			write_mode = ' -raw -overburn'
-		else:	write_mode = ' -dao -overburn'
+			write_mode = '-raw -overburn'
+		else:	write_mode = '-dao -overburn'
 	else:
-		write_mode = ' -tao -multi'
+		write_mode = '-tao -multi'
 
-	if speed:  speed_addon = ' speed=%d' % speed
+	if speed:  speed_addon = 'speed=%d' % speed
 	else:	   speed_addon = ''
-	cdrecord_cmd = filter_opts( \
-		'cdrecord dev=%s driveropts=burnfree fs=24m gracetime=3 \
-		%s -force -v %s -waiti tsize=%lus -immed -eject -' % \
-		(device, speed_addon, write_mode, new_size), cdrecord_valid_opts )
+
+	if image:  track_addon = image
+	else:	   track_addon = '-waiti -'
+
+	cdrecord_base = \
+		'cdrecord dev=%s driveropts=burnfree fs=24m gracetime=3 ' \
+		'%s -force -v %s tsize=%lus -immed -eject %s' % \
+		(device, speed_addon, write_mode, new_size, track_addon)
+
+	cdrecord_cmd = filter_opts( cdrecord_base, cdrecord_valid_opts )
 	
-	cmd = 'mkisofs %s 2>/dev/null | %s 2>&1' % (mkisofs_opts, cdrecord_cmd) 
+	if image:
+		cmd = '%s 2>&1' % cdrecord_base
+	else:	cmd = 'mkisofs %s 2>/dev/null | %s 2>&1' % (mkisofs_opts, cdrecord_cmd) 
 	print_debug( cmd )
 
+	#dbg = file( 'debug-burn-cd', 'w' )
 	ch_out = os.popen( cmd )
 	out = []
 	while True:
@@ -907,7 +1022,7 @@ def burn_cd_disk():	#{{{
 		if c == '.':
 			if 'Operation starts.' in s:
 				write( '\b'*25 + '...' + ' '*22 + '\n' )
-				flush()
+				burning_now = True
 				update_progress_bar( 0, 2 )
 				out.append( s+'\n' )
 				break
@@ -921,7 +1036,6 @@ def burn_cd_disk():	#{{{
 			if len(s) > 1:
 				out.append( s[:-1] + '\n' )
 			s = ''
-	
 	avg_speed = 'n/a'
 	writing_time = 'n/a'
 	fixating_time = 'n/a'
@@ -936,7 +1050,7 @@ def burn_cd_disk():	#{{{
 				write( '\n' )
 				if verbose:
 					print_key_value( 'Average speed', avg_speed )
-					print_key_value( 'Writing time', writing_time )
+					print_key_value( 'Time', writing_time )
 				fixating_flag = True
 				print_task( 'Fixating...' )
 				flush()
@@ -953,6 +1067,8 @@ def burn_cd_disk():	#{{{
 					else:	writing_time = tmp_time
 				except:	pass
 			out.append( s )
+			#dbg.write( s )
+			#dbg.flush()
 			s = ''
 		elif c == '.':
 			if (' written ' in s) and ('x.' in s):
@@ -961,20 +1077,24 @@ def burn_cd_disk():	#{{{
 				written = float( pieces[2] )
 				update_progress_bar( written*100/total, 2 )
 				out.append( s + '\n' )
+				#dbg.write( s + '\n' )
+				#dbg.flush()
 				s = ''
 		elif c == '\r':
 			s = ''
 	exit_code = ch_out.close()
+	#dbg.close()
 	
 	if exit_code == None:
 		print OK
 		exit_flag = False
-		if verbose:  print_key_value( 'Fixating time', fixating_time )
+		if verbose:  print_key_value( 'Time', fixating_time )
 	else:
 		print_error( 'error' )
 		exit_flag = True
 	flush()
 			
+	burning_now = False
 	if not exit_flag:  return
 
 	if verbose:
@@ -984,7 +1104,7 @@ def burn_cd_disk():	#{{{
 #}}}
 def burn_dvd_disk():	#{{{
 	global	speed, device, mkisofs_opts, blank, growisofs, new_size, \
-		mkisofs_start, mkisofs_scale
+		mkisofs_start, mkisofs_scale, image, debug, burning_now
 
 	write( '%s %sBurning... ' % (ASTERISK, COLOR_1) )
 	flush()
@@ -992,18 +1112,20 @@ def burn_dvd_disk():	#{{{
 	if not growisofs:
 		print_error('no growisofs')
 		if verbose:
-			out = ['Program growisofs not found']
+			out = ['.....\n', 'Program growisofs not found\n']
 			print_prog_out( out )
 			flush()
 		sys.exit(1)
 
-	base = 'growisofs -use-the-force-luke=tty,notray'
+	base = 'growisofs -use-the-force-luke=tty -use-the-force-luke=notray -use-the-force-luke=moi'
+	if image:  base += ' -use-the-force-luke=dao'
+	else:	   base += ' -use-the-force-luke=tracksize:%ld' % new_size
 	if speed:  base += ' -speed=%u' % speed
-	if blank:
-		base += ' -Z %s' % device
-	else:	base += ' -M %s' % device
-		
-	cmd = '%s %s 2>&1' % ( base, mkisofs_opts )
+	if blank:  base += ' -Z %s' % device
+	else:	   base += ' -M %s' % device
+	
+	if image:  cmd = '%s=%s 2>&1' % (base, image)
+	else:	   cmd = '%s %s 2>&1' % (base, mkisofs_opts)
 	print_debug( cmd )
 
 	b_num = 0
@@ -1012,62 +1134,64 @@ def burn_dvd_disk():	#{{{
 		flush()
 		b_num = 21 
 		time.sleep(1)
+	burning_now = True
 	write( '\b'*b_num+' '*b_num+'\n' )
 	update_progress_bar( 0, 2 )
+
+	#dbg = file( 'debug-burn-cd.out', 'w' )
 
 	ch_out = os.popen( cmd )
 	out = []
 	avg_speed = None
 	writing_start = time.time()
-	leadout_start = None
+	finalizing_start = None
+	writing_in_progress = True
 	while True:
 		s = ch_out.readline(200)
 		if s == '':  break
 		out.append( s )
-		if '% done,' in s:
-			try:	p = float( s.split('%',1)[0] )
+		#dbg.write( s )
+		#dbg.flush()
+		if 'pre-formatting' in s:
+			update_progress_bar( 0, 2, True )
+		if ', remaining' in s:
+			try:
+				col2 = s.split( '%', 1 )[0].split( '(', 1 )[1]
+				p = float( col2 )
+				update_progress_bar( p, 2 )
 			except:	pass
-			if not mkisofs_start:
-				mkisofs_start = p
-				delta = 100.0 - p
-				mkisofs_scale = 100.0 / delta
-			p = (p - mkisofs_start) * mkisofs_scale
-			update_progress_bar( p, 2 )
-		if 'writing lead-out' in s:
-			print_task( 'Writing lead-out...' )
-			flush()
-			leadout_start = time.time()
-		elif 'extents written' in s:
+		elif writing_in_progress and 'flushing cache' in s:
 			update_progress_bar( 100, 2 )
 			write( '\n' )
+			writing_in_progress = False
 			if verbose:
-				t = time.time()-writing_start
+				t = time.time() - writing_start
 				speed = new_size*2 / t
 				coef = speed / 1352
 				avg_speed = '%.1fx (%.1f MB/s)' % ( coef, speed/1024 )
 				print_key_value( 'Average speed', avg_speed )
 				writing_time = '%d sec' % round( t )
-				print_key_value( 'Writing time', writing_time )
+				print_key_value( 'Time', writing_time )
+			print_task( 'Finalizing...' )
 			flush()
+			finalizing_start = time.time()
 	exit_code = ch_out.close()
+	#dbg.close()
 	
 	if exit_code == None:
 		print OK
 		exit_flag = False
 		if verbose:
-			leadout_time = '%d sec' % round( time.time()-leadout_start )
-			print_key_value( 'Lead-out time', leadout_time or 'n/a' )
+			finalizing_time = '%d sec' % round( time.time()-finalizing_start )
+			print_key_value( 'Time', finalizing_time )
 		flush()
 		ej_out, ej_excode = run_cmd( 'cdrecord dev=%s -eject 2>/dev/null' % device )
 	else:
 		print_error( 'error' )
 		exit_flag = True
 	flush()
+	burning_now = False
 			
-	# DEBUG
-	#for s in out:
-	#	print( s[:-1] )
-
 	if not exit_flag:  return
 
 	if verbose:
@@ -1102,7 +1226,10 @@ if __name__ == "__main__":	#{{{
 	if zero and not dvd:  blank_cdrw()
 
 	build_file_list()
-	check_new_session()
+	
+	if image:
+		check_image_file()
+	else:	check_new_session()
 	
 	if dvd:
 		burn_dvd_disk()

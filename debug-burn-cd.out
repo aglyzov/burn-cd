@@ -1,0 +1,35 @@
+Executing 'mkisofs -quiet -C 16,222464 -M /dev/fd/4 -r -J -joliet-long -D -U -graft-points -f -input-charset cp1251 /2/=/home/smart/games/Sam.n.Max.[Full.Rus]/Sam.n.Max.[Full.Rus].iso | builtin_dd of=/dev/hdc obs=32k seek=13904'
+mkisofs: Warning: -follow-links does not always work correctly; be careful.
+Warning: creating filesystem that does not conform to ISO-9660.
+ISO-9660 image includes checksum signature for correct inode numbers.
+Rock Ridge signatures found
+/dev/hdc: "Current Write Speed" is 2.8x1352KBps.
+  464814080/911202304 ( 2.0%) @1.7x, remaining 4:50 RBU 100.0% UBU   4.8%
+  483360768/911202304 ( 6.1%) @4.0x, remaining 2:18 RBU 100.0% UBU  99.4%
+  501907456/911202304 (10.2%) @4.0x, remaining 1:46 RBU 100.0% UBU  99.4%
+  520486912/911202304 (14.2%) @4.0x, remaining 1:36 RBU 100.0% UBU  99.4%
+  539066368/911202304 (18.3%) @4.0x, remaining 1:24 RBU 100.0% UBU  99.4%
+  557645824/911202304 (22.4%) @4.0x, remaining 1:16 RBU 100.0% UBU  99.4%
+  576225280/911202304 (26.5%) @4.0x, remaining 1:12 RBU 100.0% UBU  99.4%
+  594804736/911202304 (30.6%) @4.0x, remaining 1:05 RBU 100.0% UBU  99.4%
+  613416960/911202304 (34.6%) @4.0x, remaining 1:00 RBU 100.0% UBU  99.4%
+  632029184/911202304 (38.7%) @4.0x, remaining 0:56 RBU 100.0% UBU  99.4%
+  650641408/911202304 (42.8%) @4.0x, remaining 0:52 RBU 100.0% UBU  99.3%
+  669253632/911202304 (46.9%) @4.0x, remaining 0:47 RBU 100.0% UBU  99.4%
+  687898624/911202304 (51.0%) @4.0x, remaining 0:44 RBU 100.0% UBU  99.4%
+  706510848/911202304 (55.1%) @4.0x, remaining 0:39 RBU 100.0% UBU  99.4%
+  725155840/911202304 (59.2%) @4.0x, remaining 0:35 RBU 100.0% UBU  99.4%
+  743800832/911202304 (63.3%) @4.0x, remaining 0:32 RBU 100.0% UBU  99.4%
+  762478592/911202304 (67.4%) @4.0x, remaining 0:28 RBU 100.0% UBU  99.4%
+  781123584/911202304 (71.4%) @4.0x, remaining 0:24 RBU 100.0% UBU  99.3%
+  799801344/911202304 (75.5%) @4.0x, remaining 0:21 RBU 100.0% UBU  99.4%
+  818479104/911202304 (79.6%) @4.0x, remaining 0:17 RBU 100.0% UBU  99.4%
+  837156864/911202304 (83.7%) @4.0x, remaining 0:13 RBU 100.0% UBU  99.4%
+  855834624/911202304 (87.8%) @4.0x, remaining 0:10 RBU 100.0% UBU  99.4%
+  874512384/911202304 (91.9%) @4.0x, remaining 0:06 RBU 100.0% UBU  99.4%
+  893222912/911202304 (96.1%) @4.1x, remaining 0:03 RBU 100.0% UBU  99.4%
+/dev/hdc: flushing cache
+/dev/hdc: copying volume descriptor(s)
+/dev/hdc: flushing cache
+/dev/hdc: stopping de-icing
+/dev/hdc: writing lead-out
