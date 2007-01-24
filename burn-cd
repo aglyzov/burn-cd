@@ -3,17 +3,189 @@
 """
 Краткое описание:	удобная оболочка для cdrtools и dvd+rw-tools
 Автор:			SmART
-Последнее изменение:	28 ноября 2006
+Последнее изменение:	24 января 2007
 
 """
-import sys, os, stat, getopt, string, time, signal
+import sys, os, stat, getopt, string, time, signal, types
+
+# класс config для чтения конфигурационных файлов
+class	config( object ):  #{{{
+	"""
+	Загружает конфигурационные параметры,
+	заданные в виде списка строк "ключ <разделитель> значение"
+
+	# в начале нужно создать экземпляр класса:
+	cfg = config.config()
+
+	# также можно произвести настройку (необязательно):
+	cfg.set_param( 'ignore_unknown', False )
+	cfg.set_param( 'max_lines',	 50 )
+	cfg.set_param( 'delimiter',	 ':' )
+	cfg.set_param( 'preserve_type',	 False )
+	cfg.set_param( 'comment',	 '//' )
+
+	# кроме этого можно перегрузить обработчики (необязательно):
+	handle_not_string( self, number, obj )
+	handle_unknown_key( self, number, string, key )
+	handle_wrong_type( self, number, string, value )
+	handle_bad_format( self, number, string )
+	
+	# затем присвоить значения по-умолчанию:
+	cfg.var1 = 123		# одновременно несёт информацию о типе
+	cfg.var2 = "lala"
+	cfg.var3 = 1.2345
+
+	# после этого выполнить метод .parse(...)
+	cfg.parse( source )	# source - это итерируемый объект, например
+				# список строк или файл
+	print cfg.var1
+
+	cfg.clear()
+	"""
+	def __init__( self ):
+		object.__setattr__( self, '_param', {} )
+		# главный словарь
+		object.__setattr__( self, '_dict', {} )
+		# список пар (True,ключ)/(False,комментарий) по порядку
+		object.__setattr__( self, '_orderlist', [] )
+		
+		# параметры по-умолчанию
+		self.set_param( 'delimiter', '=' )
+		self.set_param( 'max_lines', 10000 )
+		self.set_param( 'ignore_unknown', True )
+		self.set_param( 'preserve_type', True )
+		self.set_param( 'comment', '#' )
+		self.set_param( 'eol', '\n' )
+	
+	def set_param( self, param, value ):
+		self._param[ param ] = value
+	
+	def get_param( self, param ):
+		return self._param[ param ]
+	
+	def clear( self ):
+		object.__setattr__( self, '_dict', {} )
+		object.__setattr__( self, '_orderlist', [] )
+	
+	def __setattr__( self, key, value ):
+		k = str( key ).lower()
+		dict = self._dict
+		if not dict.has_key( k ):
+			self._orderlist.append( (True,k) )
+		dict[ k ] = value
+	
+	def __delattr__( self, key ):
+		k = str( key ).lower()
+		del self._dict[ k ]
+		self._orderlist.remove( (True,k) )
+	
+	def __getattr__( self, key ):
+		k = str( key ).lower()
+		return self._dict[ k ]
+	
+	__setitem__ = __setattr__
+	__delitem__ = __delattr__
+	__getitem__ = __getattr__
+	
+	def add_comment( self, s ):
+		s = str( s )
+		self._orderlist.append( (False,s) )
+
+	def __iter__( self ):
+		dict = self._dict
+		for flag, key in self._orderlist:
+			if not flag:  continue
+			yield ( key, dict[ key ] )
+
+	def __repr__( self ):
+		final = []
+		for s in self.iterstr():
+			final.append( s )
+		return ''.join( final )
+	
+	def iterstr( self ):
+		dict = self._dict
+		param = self._param
+		delim = param['delimiter']
+		eol = param['eol']
+		comment = param['comment']
+		for flag, key in self._orderlist:
+			if flag:
+				s = '%s %s %s%s' % \
+					( key, delim, dict[key], eol )
+				yield s
+				continue
+			pieces = key.split( eol )
+			comment_pieces = []
+			for p in pieces:
+				s = '%s %s' % ( comment, p )
+				comment_pieces.append( s )
+			comment_pieces.append( '' )
+			s = eol.join( comment_pieces )
+			yield s
+	
+	def handle_not_string( self, number, obj ):
+		sys.stderr.write( '[CONFIG WARNING] line %d: input "%s" is not a string\n' % (number,`obj`) )
+	
+	def handle_unknown_key( self, number, string, key ):
+		sys.stderr.write( '[CONFIG WARNING] line %d: unknown key "%s"\n' % (number,key) )
+	
+	def handle_wrong_type( self, number, string, value ):
+		sys.stderr.write( '[CONFIG WARNING] line %d: wrong type "%s"\n' % (number,value) )
+	
+	def handle_bad_format( self, number, string ):
+		sys.stderr.write( '[CONFIG WARNING] line %d: bad format "%s"\n' % (number,string) )
+	
+	def parse( self, source ):
+		param = self._param
+		dict = self._dict
+		orderlist = self._orderlist
+		max = param['max_lines']
+		delimiter = param['delimiter']
+		comment = param['comment']
+		ignore_unknown = param['ignore_unknown']
+		preserve_type = param['preserve_type']
+		str_types = types.StringTypes
+		number = 0
+		for s in source:
+			number += 1
+			if number > max:  break
+			if type(s) not in str_types:
+				self.handle_not_string( number, s )
+				continue
+			orig = s
+			s = s.split( comment, 1 )[0]
+			s = s.strip()
+			if len(s) == 0:  continue
+			s = s.split( delimiter, 1 )
+			if len(s) != 2:
+				self.handle_bad_format( number, orig )
+				continue
+			key = s[0].strip().lower()
+			value = s[1].strip()
+			dict_has_key = dict.has_key( key )
+			if ignore_unknown and not dict_has_key:
+				self.handle_unknown_key( number, orig, key )
+				continue
+			if preserve_type and dict_has_key:
+				old_value = dict[ key ]
+				t = type( old_value )
+				if t not in str_types:
+					try:	value = t( value )
+					except:
+						self.handle_wrong_type( number, orig, value )
+						continue
+			if not dict_has_key:
+				orderlist.append( (True,key) )
+			dict[ key ] = value
+#}}}
 
 # Глобальные переменные {{{
 PROG = "burn-cd"
 
 VERSION = \
 	"%s version 1.5-alpha5\n" \
-	"Written by SmART, 2004-2006\n" % PROG
+	"Written by SmART, 2004-2007\n" % PROG
 
 USAGE = "Usage:  %s [options] <file_or_dir_to_burn> [...]\n" % PROG
 
@@ -37,6 +209,18 @@ HELP = \
    -h, --help		      show this help and exit
    --version		      show version of the program and exit
    --debug		      enable debug messages during the process
+
+Configuration:
+   files:
+      /etc/burn-cd.conf
+      $HOME/.burn-cd.conf
+
+   place there any of theese:
+      device    = /dev/hdc
+      cd-speed  = auto
+      dvd-speed = auto
+      charset   = auto
+      verbose   = no
 """
 COLOR_0		= "\033[m"	# серый
 COLOR_1		= "\033[1m"	# жирный (bold)
@@ -116,14 +300,25 @@ disk_capacities	= {
 write		= sys.stdout.write
 flush		= sys.stdout.flush
 
+global_cfg_name	= '/etc/burn-cd.conf'
+try:
+	home	= os.getenv('HOME')
+	local_cfg_name = home + '/.burn-cd.conf'
+except: local_cfg_name = None
+
+cfg = config()
+cfg.device	= '/dev/hdc'
+cfg['cd-speed'] = 'auto'
+cfg['dvd-speed']= 'auto'
+cfg.charset	= 'auto'
+cfg.verbose	= 'no'
+
 root		= '/'
-lang		= os.getenv( 'LANG' )
-try:	charset = lang.split('.')[1].lower()
-except:	charset = None
-device		= '/dev/hdc'
+charset		= None
 filenames	= None
 fnames		= None
 speed		= None 
+device		= '/dev/hdc'
 zero	  	= False
 verbose		= False
 info		= False
@@ -306,8 +501,40 @@ def update_progress_bar( percent, first_pad=0, preformat=False ):	#{{{
 	flush()
 #}}}
 
+def load_config():	#{{{
+	global	cfg, charset, device, speed, verbose, \
+		global_cfg_name, local_cfg_name
+	
+	try:	cfg.parse( file( global_cfg_name ) )
+	except:	pass
+	try:	cfg.parse( file( local_cfg_name ) )
+	except:	pass
+
+	# проверим некоторые частные случаи
+	val = cfg.charset.lower()
+	if val == 'auto':
+		try:
+			lang	= os.getenv( 'LANG' )
+			charset = lang.split('.')[1].lower()
+		except:	charset = None
+	else:	charset = val
+
+	val = cfg.verbose.lower()
+	if val in ['yes','true','1','on']:
+		verbose = True
+
+	if cfg.device:
+		device = cfg.device
+	
+	# for debug purposes
+	#print global_cfg_name
+	#print local_cfg_name
+	#for s in cfg.iterstr():
+	#	print s
+	#print charset
+#}}}
 def parse_cmd_line():	#{{{
-	global	root, lang, charset, device, speed, zero, nero, \
+	global	root, charset, device, speed, zero, nero, \
 		verbose, info, debug, media, dvd, filenames, image
 
 	opts, filenames = [], []
@@ -975,7 +1202,7 @@ def check_new_session():	#{{{
 #}}}
 def burn_cd_disk():	#{{{
 	global	single_session, raw_mode, speed, new_size, cdrecord_valid_opts, \
-		device, mkisofs_opts, image, burning_now
+		device, mkisofs_opts, image, burning_now, cfg
 
 	write( '%s %sBurning... ' % (ASTERISK, COLOR_1) )
 	flush()
@@ -987,8 +1214,17 @@ def burn_cd_disk():	#{{{
 	else:
 		write_mode = '-tao -multi'
 
-	if speed:  speed_addon = 'speed=%d' % speed
-	else:	   speed_addon = ''
+	cfg_speed = cfg['cd-speed'].lower()
+	if speed:
+		spd = speed
+	elif cfg_speed and cfg_speed != 'auto':
+		spd = cfg_speed
+	
+	try:	spd = int( spd )
+	except:	spd = None
+
+	if spd:	speed_addon = 'speed=%u' % spd
+	else:   speed_addon = ''
 
 	if image:  track_addon = image
 	else:	   track_addon = '-waiti -'
@@ -1104,7 +1340,7 @@ def burn_cd_disk():	#{{{
 #}}}
 def burn_dvd_disk():	#{{{
 	global	speed, device, mkisofs_opts, blank, growisofs, new_size, \
-		mkisofs_start, mkisofs_scale, image, debug, burning_now
+		mkisofs_start, mkisofs_scale, image, debug, burning_now, cfg
 
 	write( '%s %sBurning... ' % (ASTERISK, COLOR_1) )
 	flush()
@@ -1120,7 +1356,18 @@ def burn_dvd_disk():	#{{{
 	base = 'growisofs -use-the-force-luke=tty -use-the-force-luke=notray -use-the-force-luke=moi'
 	if image:  base += ' -use-the-force-luke=dao'
 	else:	   base += ' -use-the-force-luke=tracksize:%ld' % new_size
-	if speed:  base += ' -speed=%u' % speed
+
+	cfg_speed = cfg['dvd-speed'].lower()
+	if speed:
+		spd = speed
+	elif cfg_speed and cfg_speed != 'auto':
+		spd = cfg_speed
+	
+	try:	spd = int( spd )
+	except:	spd = None
+
+	if spd:	base += ' -speed=%u' % speed
+
 	if blank:  base += ' -Z %s' % device
 	else:	   base += ' -M %s' % device
 	
@@ -1207,6 +1454,7 @@ if __name__ == "__main__":	#{{{
 	# если stdout - не терминал, выключаем цвет
 	if not sys.stdout.isatty():  no_color()
 
+	load_config()
 	parse_cmd_line()
 
 	cmd = string.join( sys.argv )
