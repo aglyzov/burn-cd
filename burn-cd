@@ -3,7 +3,7 @@
 """
 Краткое описание:	удобная оболочка для cdrtools и dvd+rw-tools
 Автор:			SmART
-Последнее изменение:	24 января 2007
+Последнее изменение:	8 марта 2007
 
 """
 import sys, os, stat, getopt, string, time, signal, types
@@ -184,7 +184,7 @@ class	config( object ):  #{{{
 PROG = "burn-cd"
 
 VERSION = \
-	"%s version 1.5-beta\n" \
+	"%s version 1.5-beta2\n" \
 	"Written by SmART, 2004-2007\n" % PROG
 
 USAGE = "Usage:  %s [options] <file_or_dir_to_burn> [...]\n" % PROG
@@ -215,7 +215,7 @@ Configuration:
       /etc/burn-cd.conf
       $HOME/.burn-cd.conf
 
-   place there any of theese:
+   place there any of these:
       device    = /dev/hdc
       cd-speed  = auto
       dvd-speed = auto
@@ -1366,7 +1366,7 @@ def burn_dvd_disk():	#{{{
 	try:	spd = int( spd )
 	except:	spd = None
 
-	if spd:	base += ' -speed=%u' % speed
+	if spd:	base += ' -speed=%u' % spd
 
 	if blank:  base += ' -Z %s' % device
 	else:	   base += ' -M %s' % device
