@@ -1,0 +1,84 @@
+/*================================================================
+LAYOUT stylesheet for the website.
+
+Define layout and backgrounds for:
+  - Body
+  - Wrapper
+  - Header
+  - Sidebar
+  - Content
+  - Footer
+  ( Navigation is defined in navigation.css )
+  
+  ***  NO TYPOGRAPHY STYLES HERE PLEASE  ***
+  
+================================================================*/
+
+
+/* BODY 
+----------------------------------------------------------------*/
+body {
+  background: #EEE;
+  }
+
+#wrapper {
+  position: relative;
+  width: 842px;
+  margin: 40px auto;
+  padding: 0;
+  border: 1px solid #24B524;
+  background: #FFF;
+  }
+  
+  
+/* HEADER
+----------------------------------------------------------------*/
+#header {
+  position: absolute;
+  background: #24B524;
+  height: 100px;
+  width: 842px;
+  margin: 0;
+  }
+  
+
+/* CONTENT
+----------------------------------------------------------------*/
+#content {
+  float: left;
+  background: #FFF;
+  min-height: 500px;
+  padding: 20px 34px;
+  margin-top: 100px;
+  }
+
+#content .inner {
+  float: left;
+  }
+  
+
+/* SIDEBAR
+----------------------------------------------------------------*/
+#sidebar {
+  float: right;
+  width: 220px;
+  background: #F5F5F5;
+  margin-top: 100px;
+  }
+  
+#sidebar .inner {
+  padding: 10px 20px;
+  }
+
+
+/* FOOTER
+----------------------------------------------------------------*/
+#footer {
+  float: left;
+  clear: both;
+  background: #24B524;
+  width: 100%;
+  }
+  #footer .inner {
+    padding: 7px;
+    }

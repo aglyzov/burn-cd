@@ -1,0 +1,64 @@
+/*================================================================
+BASE stylesheet (probably best to leave as is)
+
+- Resets browser defaults
+- Provides some basic extra classes
+    - .clear
+    - .clearfix
+    - .hide
+- Corrects centering problem in IE 5
+  
+================================================================*/
+
+
+/* RESET BROWSER DEFAULTS
+----------------------------------------------------------------*/
+html,body,form,h1,h2,h3,h4,h5,h6,pre,form,p,blockquote,input { 
+  margin: 0; 
+  padding: 0;
+  }
+
+h1,h2,h3,h4,h5,h6,legend,pre,code { 
+  font-size: 1em; 
+  }
+
+a img,:link img,:visited img { 
+  border: none;
+  }
+
+img {
+  border: 0;
+  }
+
+address { 
+  font-style: normal;
+  }
+
+
+/* EXTRA CLASSES EVERY CSS HACKER NEEDS
+----------------------------------------------------------------*/
+.clear { 
+  clear: both; 
+  }
+
+.clearfix:after {
+  /* What's this? --> http://www.positioniseverything.net/easyclearing.html */
+	content: "."; 
+	display: block; 
+	height: 0; 
+	clear: both; 
+	visibility: hidden;
+  }
+
+* html>body .clearfix {
+	display: inline-block; 
+	width: 100%;
+  }
+
+* html .clearfix {
+	height: 1%;
+  }
+
+.hide {
+  display: none; 
+  }

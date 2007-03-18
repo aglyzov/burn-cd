@@ -1,14 +1,18 @@
 #!/usr/bin/python -O
 # -*- coding: cp1251 -*-
 """
-Краткое описание:	удобная оболочка для cdrtools и dvd+rw-tools
-Автор:			SmART
-Последнее изменение:	8 марта 2007
+description:	a handy frontend for the cdrtools/cdrkit and dvd+rw-tools
+web site:	http://burn-cd.sf.net	
+author:		SmART <realsmart@users.sourceforge.net>
+latest change:	march 18 2007
+		-- DVD speed setting is working now
+		-- fixed the detection of the blank DVD media
+		-- minor typo in the help
 
 """
 import sys, os, stat, getopt, string, time, signal, types
 
-# класс config для чтения конфигурационных файлов
+# config class to read and write simple config files
 class	config( object ):  #{{{
 	"""
 	Загружает конфигурационные параметры,
@@ -180,11 +184,11 @@ class	config( object ):  #{{{
 			dict[ key ] = value
 #}}}
 
-# Глобальные переменные {{{
+# Global variables {{{
 PROG = "burn-cd"
 
 VERSION = \
-	"%s version 1.5-beta2\n" \
+	"%s version 1.5-beta3\n" \
 	"Written by SmART, 2004-2007\n" % PROG
 
 USAGE = "Usage:  %s [options] <file_or_dir_to_burn> [...]\n" % PROG
@@ -864,7 +868,10 @@ def check_dvd_disk():	#{{{
 			try:	disk_size = s.split()[2]
 			except:	pass
 		elif 'blank:' in s:
-			try:	blank = bool( s.split()[3] == '1' )
+			try:
+				before, after = s.split('blank:', 1)
+				val = after.lstrip().split(None, 1)[0]
+				blank = bool(val == '1')
 			except:	pass
 	# объём диска по-умолчанию
 	d = disk_size + ' ' + media.split( None, 1 )[0]

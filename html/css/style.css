@@ -1,0 +1,248 @@
+/*================================================================
+The MAIN stylesheet for the website.
+
+Define SITE-WIDE styles:
+  - General Typography
+  - Header Content
+  - Sidebar Content
+  - Forms
+  - Tables
+  - Footer
+  - Sitewide Custom Definitions
+  
+================================================================*/
+
+@import url("base.css");
+@import url("layout.css");
+@import url("navigation.css");
+
+
+/* GENERAL TYPOGRAPHY (Standard HTML tags)
+----------------------------------------------------------------*/
+html, body {
+  font-family: verdana, bitstream vera sans, dejavu sans, tahoma, arial, sans-serif;
+  color: black;
+  font-size: 12px;
+  }
+
+h1 {
+  color: #BBB;
+  margin: 10px 0 8px 0;
+  padding: 3px 0;
+  font-size: 2.0em;
+  }
+
+h2 {
+  color: #000;
+  margin: 18px 0 10px 0;
+  line-height: 1.3em;
+  font: 1.8em 'Verdana', 'Bitstream Vera Sans', 'DejaVu Sans', 'Tahoma', 'Arial', sans-serif;
+  }
+
+h3 {
+  color: #054FA0;
+  margin: 36px 0 10px 0;
+  line-height: 1.3em;
+  font: 1.6em 'Verdana', 'Bitstream Vera Sans', 'DejaVu Sans', 'Tahoma', 'Arial', sans-serif;
+  border-bottom: 1px dotted #666;
+  }
+
+ul {
+  margin: 0;
+}
+
+p {
+  margin: 10px 0 6px 0;
+  color: #333;
+  font-size: 11px;
+  line-height: 1.5em;
+  }
+  
+li, li p {
+  color: #333;
+  font-weight: normal;
+  }
+
+
+a {
+  color: #054FA0;
+  text-decoration: underline;
+  }
+
+a:hover {
+  color: #17BBEA;
+  }
+
+
+/* HEADER CONTENT
+----------------------------------------------------------------*/
+#header h1 {
+  text-align: center;
+  color: #EBFAEB;
+  margin: 10px 0;
+  font-size: 3.0em;
+  }
+  
+#header h1 span {
+  display: none;
+  }
+  
+#header a.selectedLanguage {
+  color: #004C99;
+  }
+
+
+/* SIDEBAR CONTENT
+----------------------------------------------------------------*/
+#sidebar {
+  text-align: left;
+  color: #014B9C;
+  line-height: 1.4em;
+  font-size: 1.3em;
+  font-weight: bold;
+  }
+
+
+/* FORMS
+----------------------------------------------------------------*/
+fieldset {
+  float: left;
+  border: none;
+  border-top: 1px solid #ddd;
+  width: 740px;
+  margin-top: 34px;
+  padding-top: 24px;
+  }
+
+legend {
+  color: #bbb;
+  font-weight: bold;
+  font-size: 16px;
+  padding: 0 8px;
+  }
+
+label {
+  float: left;
+  clear: both;
+  width: 160px;
+  text-align: right;
+  font-size: 13px;
+  height: 15px;
+  margin: 0 10px 10px 0;
+  padding-top: 3px;
+  }
+  
+form div {
+  float: left;
+  }
+  
+input.text {
+  width: 290px;
+  } 
+
+input.textShort {
+  width: 80px;
+  }
+
+input.submit {
+  margin: 10px 0;  
+  }
+
+input.checkbox {
+  margin-top: 3px;
+  }
+
+/* TABLES
+----------------------------------------------------------------*/
+table {
+  clear: both;
+  border-collapse: collapse;
+  text-align: left;
+  }
+
+td {
+  padding: 2px 3px;
+  font-size: small;
+  vertical-align: top;
+  }
+  
+
+/* FOOTER CONTENT
+----------------------------------------------------------------*/
+
+#footer {
+  text-align: right;
+  color: #FFF;
+  font-size: 11px;
+  margin: 0;
+  }
+
+#footer a {
+  color: #00F;
+  }
+  
+#footer a:hover {
+  color: #33F;
+  }
+  
+
+/* SITE-WIDE CUSTOM STYLES (For page-specific stuff, use css/pages/mypage.css)
+------------------------------------------------------------------------------*/
+
+#languageLinks a,
+#languageLinks a:hover {
+  float: right;
+  color: #FFF;
+  padding: 6px 8px;
+  background: #BFCF0A;
+  text-decoration: none;
+  margin: 0;
+  font: 11px Trebuchet MS, Times, serif;
+  }
+  
+#languageLinks a:hover {
+  color: #004C99;
+  text-decoration: none;
+  }
+
+#formErrors {
+  border: 3px solid #000;
+  margin: 30px 0;
+  padding-bottom: 15px;
+  background: #FFE;
+  }
+  
+#formErrors h3 {
+  background: red;
+  padding: 8px;
+  color: #FFF;
+  }
+  
+#formErrors h3 ul {
+  margin: 40px;
+  }
+  
+#formSuccess {
+  border: 3px solid green;
+  margin: 30px 0;
+  padding: 15px;
+  background: #FFE;
+  }
+  
+form .highlight {
+  background: #FFFDB6;
+  }
+  
+  
+  
+h2.first {
+  margin-top: 0;
+}
+  
+p.error {
+  color: red;
+  }
+  
+h1#placeholder {
+  margin: 40px 0 400px 30px;
+  }
