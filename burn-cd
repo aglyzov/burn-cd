@@ -2,12 +2,18 @@
 # -*- coding: cp1251 -*-
 """
 description:	a handy frontend for the cdrtools/cdrkit and dvd+rw-tools
-web site:	http://burn-cd.sf.net	
+web site:	http://burn-cd.sourceforge.net	
 author:		SmART <realsmart@users.sourceforge.net>
-latest change:	march 18 2007
-		-- DVD speed setting is working now
-		-- fixed the detection of the blank DVD media
-		-- minor typo in the help
+latest changes:
+
+    1.6-beta1 -- oct 3 2007:
+     - cdrkit and growisofs fixes
+     - new dependancy: dvd+rw-mediainfo to get info about DVD media (cdrkit stopped to show that)
+
+    1.5-beta3 -- march 18 2007:
+     - DVD speed setting is working now
+     - fixed the detection of the blank DVD media
+     - minor typo in the help
 
 """
 import sys, os, stat, getopt, string, time, signal, types
@@ -188,7 +194,7 @@ class	config( object ):  #{{{
 PROG = "burn-cd"
 
 VERSION = \
-	"%s version 1.5-beta3\n" \
+	"%s version 1.6-beta1\n" \
 	"Written by SmART, 2004-2007\n" % PROG
 
 USAGE = "Usage:  %s [options] <file_or_dir_to_burn> [...]\n" % PROG
@@ -617,6 +623,11 @@ def check_programs():	#{{{
 	flush()
 	isoinfo_out, isoinfo_exit_code = run_cmd( cmd )
 	
+	cmd = 'which dvd+rw-mediainfo 2>/dev/null'
+	print_debug( cmd )
+	flush()
+	mediainfo_out, mediainfo_exit_code = run_cmd( cmd )
+	
 	cmd = 'growisofs -version 2>/dev/null | head -n1'
 	print_debug( cmd )
 	flush()
@@ -662,6 +673,12 @@ def check_programs():	#{{{
 		except:	pass
 	if verbose:
 		print_version( 'growisofs', val_str )
+
+	# dvd+rw-mediainfo
+	if mediainfo_exit_code == None:
+		mediainfo = True
+	if verbose:
+		print_version( 'mediainfo', val_str )
 
 	flush()
 		
@@ -843,10 +860,8 @@ def check_dvd_disk():	#{{{
 
 	print_task( 'Checking disk type...' )
 
-	cmd = filter_opts(
-		'cdrecord dev=%s -atip -silent -v 2>&1' % device,
-		cdrecord_valid_opts
-	)
+	cmd = 'dvd+rw-mediainfo %s 2>&1' % device
+
 	print_debug( cmd )
 	flush()
 	out, exit_code = run_cmd( cmd )
@@ -857,22 +872,22 @@ def check_dvd_disk():	#{{{
 	media_id = None
 	disk_type = media
 	disk_size = '120mm'
-	for s in out:
-		if not manufacturer and 'Manufacturer:' in s:
-			try:	manufacturer = s.split('\'')[1]
-			except:	pass
-		elif not media_id and 'Media type:' in s:
-			try:	media_id = s.split('\'')[1]
-			except:	pass
-		elif 'disc size:' in s:
-			try:	disk_size = s.split()[2]
-			except:	pass
-		elif 'blank:' in s:
-			try:
-				before, after = s.split('blank:', 1)
-				val = after.lstrip().split(None, 1)[0]
-				blank = bool(val == '1')
-			except:	pass
+        for s in out:
+                if not manufacturer and 'Media ID' in s:
+                        try:
+                            before, after = s.split(':')
+                            parts = after.strip().split('/',1)
+                            if len(parts) == 2:
+                                manufacturer, media_id = parts
+                            else:
+                                media_id = parts[0]
+                        except: pass
+                elif 'Disc status' in s:
+                        try:
+                                before, after = s.split(':', 1)
+                                val = after.strip()
+                                blank = bool(val == 'blank')
+                        except: pass
 	# объём диска по-умолчанию
 	d = disk_size + ' ' + media.split( None, 1 )[0]
 	total_space = disk_capacities[ d ]
@@ -1360,9 +1375,9 @@ def burn_dvd_disk():	#{{{
 			flush()
 		sys.exit(1)
 
-	base = 'growisofs -use-the-force-luke=tty -use-the-force-luke=notray -use-the-force-luke=moi'
+	base = 'growisofs -use-the-force-luke=tty -use-the-force-luke=notray'
 	if image:  base += ' -use-the-force-luke=dao'
-	else:	   base += ' -use-the-force-luke=tracksize:%ld' % new_size
+	else:	   base += ' -use-the-force-luke=moi -use-the-force-luke=tracksize:%ld' % new_size
 
 	cfg_speed = cfg['dvd-speed'].lower()
 	if speed:
