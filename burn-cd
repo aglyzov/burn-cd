@@ -1,10 +1,16 @@
 #!/usr/bin/python -O
-# -*- coding: cp1251 -*-
+# -*- coding: utf-8 -*-
 """
 description:	a handy frontend for the cdrtools/cdrkit and dvd+rw-tools
-web site:	http://burn-cd.sourceforge.net	
-author:		SmART <realsmart@users.sourceforge.net>
+web site:		http://burn-cd.sourceforge.net	
+author:			SmART <realsmart@users.sourceforge.net>
 latest changes:
+
+    1.6-beta2 -- nov 21 2007:
+     - show max read/write speeds for the DVD media in verbose mode
+     - total disk capacity is now taken from the dvd+rw-mediainfo output -
+	   so that fixes the issue with the 5.9 GB DL disks.
+	 - source file converted to the UTF-8 encoding.
 
     1.6-beta1 -- oct 3 2007:
      - cdrkit and growisofs fixes
@@ -21,45 +27,45 @@ import sys, os, stat, getopt, string, time, signal, types
 # config class to read and write simple config files
 class	config( object ):  #{{{
 	"""
-	Загружает конфигурационные параметры,
-	заданные в виде списка строк "ключ <разделитель> значение"
+	Р—Р°РіСЂСѓР¶Р°РµС‚ РєРѕРЅС„РёРіСѓСЂР°С†РёРѕРЅРЅС‹Рµ РїР°СЂР°РјРµС‚СЂС‹,
+	Р·Р°РґР°РЅРЅС‹Рµ РІ РІРёРґРµ СЃРїРёСЃРєР° СЃС‚СЂРѕРє "РєР»СЋС‡ <СЂР°Р·РґРµР»РёС‚РµР»СЊ> Р·РЅР°С‡РµРЅРёРµ"
 
-	# в начале нужно создать экземпляр класса:
+	# РІ РЅР°С‡Р°Р»Рµ РЅСѓР¶РЅРѕ СЃРѕР·РґР°С‚СЊ СЌРєР·РµРјРїР»СЏСЂ РєР»Р°СЃСЃР°:
 	cfg = config.config()
 
-	# также можно произвести настройку (необязательно):
+	# С‚Р°РєР¶Рµ РјРѕР¶РЅРѕ РїСЂРѕРёР·РІРµСЃС‚Рё РЅР°СЃС‚СЂРѕР№РєСѓ (РЅРµРѕР±СЏР·Р°С‚РµР»СЊРЅРѕ):
 	cfg.set_param( 'ignore_unknown', False )
 	cfg.set_param( 'max_lines',	 50 )
 	cfg.set_param( 'delimiter',	 ':' )
 	cfg.set_param( 'preserve_type',	 False )
 	cfg.set_param( 'comment',	 '//' )
 
-	# кроме этого можно перегрузить обработчики (необязательно):
+	# РєСЂРѕРјРµ СЌС‚РѕРіРѕ РјРѕР¶РЅРѕ РїРµСЂРµРіСЂСѓР·РёС‚СЊ РѕР±СЂР°Р±РѕС‚С‡РёРєРё (РЅРµРѕР±СЏР·Р°С‚РµР»СЊРЅРѕ):
 	handle_not_string( self, number, obj )
 	handle_unknown_key( self, number, string, key )
 	handle_wrong_type( self, number, string, value )
 	handle_bad_format( self, number, string )
 	
-	# затем присвоить значения по-умолчанию:
-	cfg.var1 = 123		# одновременно несёт информацию о типе
+	# Р·Р°С‚РµРј РїСЂРёСЃРІРѕРёС‚СЊ Р·РЅР°С‡РµРЅРёСЏ РїРѕ-СѓРјРѕР»С‡Р°РЅРёСЋ:
+	cfg.var1 = 123		# РѕРґРЅРѕРІСЂРµРјРµРЅРЅРѕ РЅРµСЃС‘С‚ РёРЅС„РѕСЂРјР°С†РёСЋ Рѕ С‚РёРїРµ
 	cfg.var2 = "lala"
 	cfg.var3 = 1.2345
 
-	# после этого выполнить метод .parse(...)
-	cfg.parse( source )	# source - это итерируемый объект, например
-				# список строк или файл
+	# РїРѕСЃР»Рµ СЌС‚РѕРіРѕ РІС‹РїРѕР»РЅРёС‚СЊ РјРµС‚РѕРґ .parse(...)
+	cfg.parse( source )	# source - СЌС‚Рѕ РёС‚РµСЂРёСЂСѓРµРјС‹Р№ РѕР±СЉРµРєС‚, РЅР°РїСЂРёРјРµСЂ
+				# СЃРїРёСЃРѕРє СЃС‚СЂРѕРє РёР»Рё С„Р°Р№Р»
 	print cfg.var1
 
 	cfg.clear()
 	"""
 	def __init__( self ):
 		object.__setattr__( self, '_param', {} )
-		# главный словарь
+		# РіР»Р°РІРЅС‹Р№ СЃР»РѕРІР°СЂСЊ
 		object.__setattr__( self, '_dict', {} )
-		# список пар (True,ключ)/(False,комментарий) по порядку
+		# СЃРїРёСЃРѕРє РїР°СЂ (True,РєР»СЋС‡)/(False,РєРѕРјРјРµРЅС‚Р°СЂРёР№) РїРѕ РїРѕСЂСЏРґРєСѓ
 		object.__setattr__( self, '_orderlist', [] )
 		
-		# параметры по-умолчанию
+		# РїР°СЂР°РјРµС‚СЂС‹ РїРѕ-СѓРјРѕР»С‡Р°РЅРёСЋ
 		self.set_param( 'delimiter', '=' )
 		self.set_param( 'max_lines', 10000 )
 		self.set_param( 'ignore_unknown', True )
@@ -232,16 +238,16 @@ Configuration:
       charset   = auto
       verbose   = no
 """
-COLOR_0		= "\033[m"	# серый
-COLOR_1		= "\033[1m"	# жирный (bold)
-COLOR_2		= "\033[0;32m"	# зелёный
-COLOR_3		= "\033[1;32m"	# ярко-зелёный
-COLOR_4		= "\033[0;33m"	# жёлтый
-COLOR_5		= "\033[1;33m"	# ярко-жёлтый
-COLOR_6		= "\033[0;36m"	# бирюзовый
-COLOR_7		= "\033[1;36m"	# ярко-бирюзовый
-COLOR_8		= "\033[1;31m"	# ярко-красный
-COLOR_9		= "\033[1;34m"	# ярко-синий
+COLOR_0		= "\033[m"	# СЃРµСЂС‹Р№
+COLOR_1		= "\033[1m"	# Р¶РёСЂРЅС‹Р№ (bold)
+COLOR_2		= "\033[0;32m"	# Р·РµР»С‘РЅС‹Р№
+COLOR_3		= "\033[1;32m"	# СЏСЂРєРѕ-Р·РµР»С‘РЅС‹Р№
+COLOR_4		= "\033[0;33m"	# Р¶С‘Р»С‚С‹Р№
+COLOR_5		= "\033[1;33m"	# СЏСЂРєРѕ-Р¶С‘Р»С‚С‹Р№
+COLOR_6		= "\033[0;36m"	# Р±РёСЂСЋР·РѕРІС‹Р№
+COLOR_7		= "\033[1;36m"	# СЏСЂРєРѕ-Р±РёСЂСЋР·РѕРІС‹Р№
+COLOR_8		= "\033[1;31m"	# СЏСЂРєРѕ-РєСЂР°СЃРЅС‹Р№
+COLOR_9		= "\033[1;34m"	# СЏСЂРєРѕ-СЃРёРЅРёР№
 
 OK 		= COLOR_9+'['+COLOR_3+'ok'+COLOR_9+']'+COLOR_0
 ASTERISK	= COLOR_3+'*'+COLOR_0
@@ -520,7 +526,7 @@ def load_config():	#{{{
 	try:	cfg.parse( file( local_cfg_name ) )
 	except:	pass
 
-	# проверим некоторые частные случаи
+	# РїСЂРѕРІРµСЂРёРј РЅРµРєРѕС‚РѕСЂС‹Рµ С‡Р°СЃС‚РЅС‹Рµ СЃР»СѓС‡Р°Рё
 	val = cfg.charset.lower()
 	if val == 'auto':
 		try:
@@ -868,29 +874,57 @@ def check_dvd_disk():	#{{{
 
 	blank = False
 	total_space = free_space = 0
+        max_size = max_rspeed = max_wspeed = 0
 	manufacturer = None
 	media_id = None
 	disk_type = media
 	disk_size = '120mm'
-        for s in out:
-                if not manufacturer and 'Media ID' in s:
-                        try:
-                            before, after = s.split(':')
-                            parts = after.strip().split('/',1)
-                            if len(parts) == 2:
-                                manufacturer, media_id = parts
-                            else:
-                                media_id = parts[0]
-                        except: pass
-                elif 'Disc status' in s:
-                        try:
-                                before, after = s.split(':', 1)
-                                val = after.strip()
-                                blank = bool(val == 'blank')
-                        except: pass
-	# объём диска по-умолчанию
-	d = disk_size + ' ' + media.split( None, 1 )[0]
-	total_space = disk_capacities[ d ]
+	for s in out:
+		if not manufacturer and 'Media ID' in s:
+			try:
+				before, after = s.split(':')
+				parts = after.strip().split('/',1)
+				if len(parts) == 2:
+					manufacturer, media_id = parts
+				else:
+					media_id = parts[0]
+			except:
+				pass
+		elif 'Disc status' in s:
+			try:
+				before, after = s.split(':', 1)
+				val = after.strip()
+				blank = bool(val == 'blank')
+			except:
+				pass
+		elif 'Speed Descriptor' in s:
+			try:
+				before, after = s.split(':', 1)
+				val = after.strip()
+				size, rspeed, wspeed = val.split()
+				
+				# size
+				unused, size = size.split('/')
+				max_size = max( max_size, int( size ) )
+
+				# read speed
+				unused, speed = rspeed.split('@')
+				speed, unused = speed.split('x')
+				max_rspeed = max( max_rspeed, float( speed ) )
+
+				# write speed
+				unused, speed = wspeed.split('@')
+				speed, unused = speed.split('x')
+				max_wspeed = max( max_wspeed, float( speed ) )
+			except:
+				pass
+
+	if max_size:
+		total_space = max_size
+	else:
+		# РѕР±СЉС‘Рј РґРёСЃРєР° РїРѕ-СѓРјРѕР»С‡Р°РЅРёСЋ
+		d = disk_size + ' ' + media.split( None, 1 )[0]
+		total_space = disk_capacities[ d ]
 	
 	appendable = True
 	if 'ROM' in media:
@@ -947,6 +981,19 @@ def check_dvd_disk():	#{{{
 		print_key_value( 'Physical size', disk_size )
 		if media_id:  manufacturer += '/'+media_id
 		print_key_value( 'Media ID', manufacturer or 'n/a' )
+		# read speed
+		if max_rspeed:
+			rspeed_str = '%.1fx (%.1f MB/s)' % (max_rspeed, max_rspeed * 1385.0 / 1024)
+			print_key_value( 'Read speed', rspeed_str )
+		else:
+			print_key_value( 'Read speed', 'n/a' )
+		# write speed
+		if max_wspeed:
+			wspeed_str = '%.1fx (%.1f MB/s)' % (max_wspeed, max_wspeed * 1385.0 / 1024)
+			print_key_value( 'Write speed', wspeed_str )
+		else:
+			print_key_value( 'Write speed', 'n/a' )
+		# space
 		if total_space:
 			spc = '%.1f MB' % (total_space/(512.0))
 			print_key_value( 'Total space', spc )
@@ -1473,7 +1520,7 @@ if __name__ == "__main__":	#{{{
 	signal.signal( signal.SIGINT, handle_signal )
 	signal.signal( signal.SIGTERM, handle_signal )
 
-	# если stdout - не терминал, выключаем цвет
+	# РµСЃР»Рё stdout - РЅРµ С‚РµСЂРјРёРЅР°Р», РІС‹РєР»СЋС‡Р°РµРј С†РІРµС‚
 	if not sys.stdout.isatty():  no_color()
 
 	load_config()
@@ -1506,4 +1553,4 @@ if __name__ == "__main__":	#{{{
 	else:	burn_cd_disk()
 #}}}
 	
-# vim:tw=0:ts=8:fdm=marker
+# vim:noet:tw=0:ts=4:sts=4:sw=4:fdm=marker
