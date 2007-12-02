@@ -1,16 +1,19 @@
 #!/usr/bin/python -O
-# -*- coding: utf-8 -*-
+# vim: fileencoding=utf-8:noet:tw=0:ts=4:sts=4:sw=4:fdm=marker
 """
 description:	a handy frontend for the cdrtools/cdrkit and dvd+rw-tools
 web site:		http://burn-cd.sourceforge.net	
 author:			SmART <realsmart@users.sourceforge.net>
 latest changes:
 
+    1.7-beta1 -- dec 02 2007:
+     - added support for DVD-Video
+
     1.6-beta2 -- nov 21 2007:
      - show max read/write speeds for the DVD media in verbose mode
      - total disk capacity is now taken from the dvd+rw-mediainfo output -
 	   so that fixes the issue with the 5.9 GB DL disks.
-	 - source file converted to the UTF-8 encoding.
+	 - source file converted to the UTF-8 encoding
 
     1.6-beta1 -- oct 3 2007:
      - cdrkit and growisofs fixes
@@ -22,41 +25,40 @@ latest changes:
      - minor typo in the help
 
 """
-import sys, os, stat, getopt, string, time, signal, types
+import sys, os, stat, getopt, string, time, signal, types, random, atexit
 
 # config class to read and write simple config files
 class	config( object ):  #{{{
-	"""
-	Загружает конфигурационные параметры,
-	заданные в виде списка строк "ключ <разделитель> значение"
+	"""	Загружает конфигурационные параметры,
+		заданные в виде списка строк "ключ <разделитель> значение"
 
-	# в начале нужно создать экземпляр класса:
-	cfg = config.config()
+		# в начале нужно создать экземпляр класса:
+		cfg = config.config()
 
-	# также можно произвести настройку (необязательно):
-	cfg.set_param( 'ignore_unknown', False )
-	cfg.set_param( 'max_lines',	 50 )
-	cfg.set_param( 'delimiter',	 ':' )
-	cfg.set_param( 'preserve_type',	 False )
-	cfg.set_param( 'comment',	 '//' )
+		# также можно произвести настройку (необязательно):
+		cfg.set_param( 'ignore_unknown', False )
+		cfg.set_param( 'max_lines',	 50 )
+		cfg.set_param( 'delimiter',	 ':' )
+		cfg.set_param( 'preserve_type',	 False )
+		cfg.set_param( 'comment',	 '//' )
 
-	# кроме этого можно перегрузить обработчики (необязательно):
-	handle_not_string( self, number, obj )
-	handle_unknown_key( self, number, string, key )
-	handle_wrong_type( self, number, string, value )
-	handle_bad_format( self, number, string )
-	
-	# затем присвоить значения по-умолчанию:
-	cfg.var1 = 123		# одновременно несёт информацию о типе
-	cfg.var2 = "lala"
-	cfg.var3 = 1.2345
+		# кроме этого можно перегрузить обработчики (необязательно):
+		handle_not_string( self, number, obj )
+		handle_unknown_key( self, number, string, key )
+		handle_wrong_type( self, number, string, value )
+		handle_bad_format( self, number, string )
+		
+		# затем присвоить значения по-умолчанию:
+		cfg.var1 = 123		# одновременно несёт информацию о типе
+		cfg.var2 = "lala"
+		cfg.var3 = 1.2345
 
-	# после этого выполнить метод .parse(...)
-	cfg.parse( source )	# source - это итерируемый объект, например
-				# список строк или файл
-	print cfg.var1
+		# после этого выполнить метод .parse(...)
+		cfg.parse( source )	# source - это итерируемый объект, например
+					# список строк или файл
+		print cfg.var1
 
-	cfg.clear()
+		cfg.clear()
 	"""
 	def __init__( self ):
 		object.__setattr__( self, '_param', {} )
@@ -200,14 +202,15 @@ class	config( object ):  #{{{
 PROG = "burn-cd"
 
 VERSION = \
-	"%s version 1.6-beta2\n" \
-	"Written by SmART, 2004-2007\n" % PROG
+	"%s version 1.7-beta1\n" \
+	"Written by SmART, 2004-2007" % PROG
 
 USAGE = "Usage:  %s [options] <file_or_dir_to_burn> [...]\n" % PROG
 
 DESCRIPTION = \
-	"This is a handy frontend for the cdrtools/cdrkit and the dvd+rw-tools\n" \
-	"for easy burning of the single & multi session CD/DVD disks.\n"
+	"This is a handy console frontend for the cdrtools/cdrkit and the dvd+rw-tools.\n" \
+	"It's main purpose is an easy and convenient burning of single & multi session\n" \
+	"CD/DVD disks (including ISO-images and DVD-Video).\n"
 
 HELP = \
 """Options:
@@ -216,15 +219,16 @@ HELP = \
    -s<N>,    --speed=<N>      tell cdrecord to burn CD on specific speed
    -c<XYZ>,  --charset=<XYZ>  charset of the filenames (defaults to LOCALE)
    -m<FILE>, --image=<FILE>   burn FILE as a disk image (ex. iso, bin, ...)
-   -z,       --zero           blank RW-media before burning (if needed)
+   --video                    burn DIR or FILES as a DVD-Video
+   -z,       --zero           blank RW-media before burning (only if needed)
    --nero                     try to continue rotten multisession recording
    
-   -i, --info		      show drive/media info and exit
-   -n, --no-color	      disable colors
-   -v, --verbose	      show more information during the process
-   -h, --help		      show this help and exit
-   --version		      show version of the program and exit
-   --debug		      enable debug messages during the process
+   -i, --info                 show drive/media info and exit
+   -n, --no-color             disable colors
+   -v, --verbose              show more information during the process
+   -h, --help                 show this help and exit
+   --version                  show version of the program and exit
+   --debug                    enable debug messages during the process
 
 Configuration:
    files:
@@ -294,6 +298,7 @@ mmc_profiles	= {
 	'0xFFFF':	'No standard Profile'
 }
 
+# this is deprecated and not used any more
 disk_capacities	= {
 	'80mm DVD-R':		714544,
 	'80mm DVD-R/DL':	1298828,
@@ -335,17 +340,19 @@ filenames	= None
 fnames		= None
 speed		= None 
 device		= '/dev/hdc'
-zero	  	= False
+zero        = False
 verbose		= False
 info		= False
 debug		= False
 image		= None
 nero		= False
+video		= False
+tmp_dir		= None
 
 media		= None
 blank		= False
 single_session	= False
-dvd 		= False
+dvd         = False
 free_space	= None
 total_space	= None
 last_start	= None
@@ -368,6 +375,53 @@ last_time	= None
 one_speed	= 150.0
 #}}}
 
+def rm_tmp_dir():  #{{{
+	global tmp_dir
+
+	# making the shortcuts
+	os_stat = os.stat
+	os_listdir = os.listdir
+	os_remove = os.remove
+	os_rmdir = os.rmdir
+	S_ISDIR = stat.S_ISDIR
+	ST_MODE = stat.ST_MODE
+
+	try:	f_stat = os_stat( tmp_dir )
+	except:	return
+
+	if not S_ISDIR( f_stat[ ST_MODE ] ):
+		try:	os_rmdir( tmp_dir )
+		except:	pass
+		return
+
+	to_check = [ tmp_dir ]
+	to_remove = []
+	
+	# checking the tree and removing all but the dirs
+	while to_check:
+		d = to_check.pop(0)
+		for f in os_listdir( d ):
+			f = '%s/%s' % (d,f)
+			try:
+				f_stat = os_stat( f )
+			except:
+				print_debug( 'Could not stat:  %s' % f )
+				continue
+			mode = f_stat[ ST_MODE ]
+			if not S_ISDIR( mode ):
+				try:	os_remove( f )	# removing files, links, etc.
+				except:	print_debug( 'Could not remove:  %s' % f )
+			else:
+				to_check.append( f )
+		to_remove.append( d )
+	
+	# removing dirs
+	while to_remove:
+		d = to_remove.pop()
+		try:	os_rmdir( d )
+		except:	print_debug( 'Could not remove:  %s' % d )
+#}}}
+
 def handle_signal( signum, frame ):	#{{{
 	global burning_now
 	
@@ -376,8 +430,9 @@ def handle_signal( signum, frame ):	#{{{
 	if signum == signal.SIGINT:
 		name = 'SIGINT (Ctrl-C)'
 	else:	name = 'SIGTERM'
-	print '%s[%ssignal%s]\n%sGot signal %s, terminating...%s' % \
+	print '%s[%ssignal%s]\n%sGot a signal %s, terminating...%s' % \
 		(COLOR_5, COLOR_8, COLOR_5, COLOR_4, name, COLOR_0)
+
 	sys.exit(10)
 #}}}
 
@@ -551,16 +606,19 @@ def load_config():	#{{{
 #}}}
 def parse_cmd_line():	#{{{
 	global	root, charset, device, speed, zero, nero, \
-		verbose, info, debug, media, dvd, filenames, image
+		verbose, info, debug, media, dvd, filenames, image, video
 
 	opts, filenames = [], []
 	try:	opts, filenames = getopt.getopt(
 			sys.argv[1:], 'vnr:d:hc:is:zm:',
-			[ 'help', 'verbose', 'no-color', 'root=', 'device=',
-			  'speed=', 'charset=', 'version', 'info', 'debug',
-			  'zero', 'nero', 'image=' ]
+			[ 'help',   'verbose',  'no-color', 'root=', 'device=',
+              'speed=', 'charset=', 'version',  'info',  'debug',
+              'zero',   'nero',     'image=',   'video']
 		)
 	except getopt.GetoptError:
+		print
+		print_error('Error: wrong arguments')
+		print
 		print USAGE
 		print DESCRIPTION
 		print HELP
@@ -599,8 +657,13 @@ def parse_cmd_line():	#{{{
 		elif opt in ['-i','--info']:
 			info = True
 			verbose = True
+		elif opt in ['--video']:
+			video = True
 	
 	if not filenames and not (info or zero or image):
+		print
+		print_error('Error: you should specify files and/or dirs to burn')
+		print
 		print USAGE
 		print DESCRIPTION
 		print HELP
@@ -698,7 +761,7 @@ def check_programs():	#{{{
 #}}}
 def check_disk_in_drive():	#{{{
 	global	cdrecord_valid_opts, media, dvd, device, mmc_profiles, \
-		verbose, one_speed
+		verbose, one_speed, video
 
 	print_task('Looking for a disk in drive...')
 
@@ -723,8 +786,12 @@ def check_disk_in_drive():	#{{{
 				dvd = True
 				one_speed = 1352.0
 	if exit_code == None:
-		print OK
-		exit_flag = False
+		if video and not dvd:
+			print_error('not a DVD')
+			exit_flag = True
+		else:
+			print OK
+			exit_flag = False
 	else:
 		print_error( error_str )
 		exit_flag = True
@@ -862,7 +929,7 @@ def check_cd_disk():	#{{{
 def check_dvd_disk():	#{{{
 	global	media, device, cdrecord_valid_opts, disk_capacities, verbose, \
 		zero, blank, isoinfo, free_space, total_space, mkisofs_start, \
-		mkisofs_scale
+		mkisofs_scale, video
 
 	print_task( 'Checking disk type...' )
 
@@ -874,7 +941,7 @@ def check_dvd_disk():	#{{{
 
 	blank = False
 	total_space = free_space = 0
-        max_size = max_rspeed = max_wspeed = 0
+    max_size = max_rspeed = max_wspeed = 0
 	manufacturer = None
 	media_id = None
 	disk_type = media
@@ -938,6 +1005,10 @@ def check_dvd_disk():	#{{{
 		if zero and not blank:
 			print_error('non blankable')
 			out += [ '.....\n', 'DVD+/-R media can not be blanked.\n' ]
+			exit_flag = True
+		elif video and not blank:
+			print_error('not blank')
+			out += [ '.....\n', 'disk is not blank -- no way to burn DVD-Video on it\n' ]
 			exit_flag = True
 		else:
 			print OK
@@ -1009,54 +1080,143 @@ def check_dvd_disk():	#{{{
 	sys.exit(1)
 #}}}
 def build_file_list():	#{{{
-	global filenames, fnames, debug, image
+	global filenames, fnames, debug, image, root, video, tmp_dir
 
 	os_stat = os.stat
+	os_listdir = os.listdir
 	os_abspath = os.path.abspath
+	os_symlink = os.symlink
 	os_expanduser = os.path.expanduser
 	os_basename = os.path.basename
 	S_ISDIR = stat.S_ISDIR
 	S_ISREG = stat.S_ISREG
 	S_ISLNK = stat.S_ISLNK
+	S_ISFIFO = stat.S_ISFIFO
 	ST_MODE = stat.ST_MODE
 
-	fnames = []
+	# filtering the filenames list
+	valid_filenames = []
 	for f in filenames:
 		f = os_abspath( os_expanduser( f ) )
-		try:	f_stat = os_stat( f )
+		try:
+			f_stat = os_stat( f )
 		except:
-			print_debug( 'Not a file, link or dir. Skipped:  %s' % f )
+			print_debug( 'Could not stat:  %s' % f )
 			continue
 		mode = f_stat[ ST_MODE ]
-		f = escape_str( f )
-		basename = os_basename( f )
-		ok = False
-		dir_flag = False
-		if S_ISDIR( mode ):
-			prefix = root + '/' + basename + '/='
-			dir_flag = True
-			ok = True
-		elif S_ISREG( mode ) or S_ISLNK( mode ):
-			prefix = root + '/='
-			ok = True
-		else:
-			print_debug( 'Not a file, link or dir. Skipped:  %s' % f )
-			
-		if ok:
-			if root == '' and not dir_flag:  prefix = ''
-			fnames.append( prefix + f )
-	flush()
+		valid_filenames.append( (f, mode) )
 	
-	if image and fnames:
-		write( '%sAmbiguous options: image and filenames simultaneously, exiting...%s\n' % \
-			(COLOR_4,COLOR_0) )
-		sys.exit(4)
-		
-	if not image and not fnames:
+	if image:
+		if valid_filenames:
+			write( '%sAmbiguous arguments: you\'ve specified both image and files/dirs, exiting...%s\n' % \
+				   (COLOR_4,COLOR_0) )
+			sys.exit(4)
+		else:
+			return
+
+	elif not valid_filenames:	
 		write( '%sNothing to write, exiting...%s\n' % (COLOR_4,COLOR_0) )
 		sys.exit(3)
-	
-	fnames = string.join( fnames )
+
+	# DVD-Video
+	if video:
+		video_extensions = {'.VOB':0, '.IFO':0, '.BUP':0}
+
+		no_video_struct = True	# no valid DVD-Video structure by default
+		video_ts_dir = None
+
+		# check for VIDEO_TS/ in the args
+		for f, mode in valid_filenames:
+			if S_ISDIR( mode ) and os_basename( f ).upper() == 'VIDEO_TS':
+				video_ts_dir = f
+				break
+
+		l = len( valid_filenames )
+
+		# check for VIDEO_TS/ inside a single arg dir
+		if not video_ts_dir and l==1 and S_ISDIR( valid_filenames[0][1] ):
+			d = valid_filenames[0][0]
+			for f in os_listdir( d ):
+				d_f = '%s/%s' % (d,f)
+				try:
+					f_stat = os_stat( d_f )
+				except:
+					print_debug( 'Could not stat:  %s' % d_f )
+					continue
+				if S_ISDIR( f_stat[ ST_MODE ] ) and f.upper() == 'VIDEO_TS':
+					video_ts_dir = d_f
+					break
+		
+		# get the VIDEO_TS/* filelist
+		if video_ts_dir:
+			valid_filenames = []
+			for f in os_listdir( video_ts_dir ):
+				f = '%s/%s' % (video_ts_dir, f)
+				f_stat = os_stat( f )
+				valid_filenames.append( (f, f_stat[ ST_MODE]) )
+
+		# filter valid DVD-Video files from the filelist
+		_filenames = []
+		for f, mode in valid_filenames:
+			if not (S_ISREG(mode) or S_ISLNK(mode) or S_ISFIFO(mode)):
+				continue
+			ext = f[ f.rfind('.') : ].upper()
+			if ext not in video_extensions:
+				continue
+			video_extensions[ ext ] += 1
+			_filenames.append( f )
+		valid_filenames = _filenames
+
+		print_debug('valid_filenames:')
+		for f in valid_filenames:
+			print_debug( '    ' + f )
+		
+		empty_ext = [ e for e,v in video_extensions.items() if not v ]
+		# exit if something was not found
+		if empty_ext:
+			write( '%sNo valid DVD-Video structure could be found, exiting...%s\n' % (COLOR_4,COLOR_0) )
+			sys.exit(6)
+
+		# creating a tmp dir and making the symlinks
+		atexit.register( rm_tmp_dir )	# registering cleaning handler
+		tmp_dir = '/tmp/burn-cd--%s--%s' % (os.getpid(), random.randint(1000,9999))
+		try:
+			os.mkdir( tmp_dir, 0700 )
+			os.mkdir( tmp_dir + '/AUDIO_TS', 0700 )
+			os.mkdir( tmp_dir + '/VIDEO_TS', 0700 )
+				
+			for f in valid_filenames:
+				base = os_basename( f ).upper()
+				os.symlink( f, '%s/VIDEO_TS/%s' % (tmp_dir, base) )
+		except Exception, why:
+			write( '%sError creating a DVD-Video structure in %s:\n%s%s\n' % (COLOR_4, tmp_dir, why, COLOR_0) )
+			sys.exit(7)
+
+		fnames = tmp_dir
+
+	# plain files and dirs (no DVD-Video)
+    else:
+		fnames = []
+		for f, mode in valid_filenames:
+			f = escape_str( f )
+			basename = os_basename( f )
+			ok = False
+			dir_flag = False
+			if S_ISDIR( mode ):
+				prefix = root + '/' + basename + '/='
+				dir_flag = True
+				ok = True
+			elif S_ISREG( mode ) or S_ISLNK( mode ):
+				prefix = root + '/='
+				ok = True
+			else:
+				print_debug( 'Not a file, link or dir. Skipped:  %s' % f )
+			if ok:
+				if root == '' and not dir_flag:  prefix = ''
+				fnames.append( prefix + f )
+		fnames = string.join( fnames )
+
+	flush()
 #}}}
 def blank_cdrw():	#{{{
 	global blank, device, burning_now
@@ -1191,7 +1351,7 @@ def check_image_file():	#{{{
 #}}}
 def check_new_session():	#{{{
 	global	verbose, charset, last_start, new_start, device, \
-		mkisofs_valid_opts, free_space, zero, nero, \
+		mkisofs_valid_opts, free_space, zero, nero, video, dvd, \
 		mkisofs_opts, raw_mode, single_session, new_size
 
 	print_task( 'Calculating new session size...' )
@@ -1225,6 +1385,10 @@ def check_new_session():	#{{{
 		mode_str = 'continue multi-session'
 		multi_overhead = 6902
 
+	if video and dvd:
+		mode_str = 'DVD-Video'
+		multi_overhead = 0
+
 	if exit_code != None:
 		print_error( 'something wrong' )
 		exit_flag = True
@@ -1248,7 +1412,8 @@ def check_new_session():	#{{{
 						mode_str = 'single session, raw'
 					else:
 						too_big = True
-			else:	too_big = True
+			else:
+				too_big = True
 		if too_big:
 			print_error( 'too big' )
 			exit_flag = True
@@ -1409,7 +1574,7 @@ def burn_cd_disk():	#{{{
 #}}}
 def burn_dvd_disk():	#{{{
 	global	speed, device, mkisofs_opts, blank, growisofs, new_size, \
-		mkisofs_start, mkisofs_scale, image, debug, burning_now, cfg
+		mkisofs_start, mkisofs_scale, image, debug, burning_now, cfg, video
 
 	write( '%s %sBurning... ' % (ASTERISK, COLOR_1) )
 	flush()
@@ -1421,10 +1586,12 @@ def burn_dvd_disk():	#{{{
 			print_prog_out( out )
 			flush()
 		sys.exit(1)
+	
 
 	base = 'growisofs -use-the-force-luke=tty -use-the-force-luke=notray'
 	if image:  base += ' -use-the-force-luke=dao'
-	else:	   base += ' -use-the-force-luke=moi -use-the-force-luke=tracksize:%ld' % new_size
+	else:      base += ' -use-the-force-luke=moi -use-the-force-luke=tracksize:%ld' % new_size
+	if video:  base += ' -dvd-compat'
 
 	cfg_speed = cfg['dvd-speed'].lower()
 	if speed:
@@ -1438,7 +1605,8 @@ def burn_dvd_disk():	#{{{
 	if spd:	base += ' -speed=%u' % spd
 
 	if blank:  base += ' -Z %s' % device
-	else:	   base += ' -M %s' % device
+	else:      base += ' -M %s' % device
+	if video:  base += ' -dvd-video'
 	
 	if image:  cmd = '%s=%s 2>&1' % (base, image)
 	else:	   cmd = '%s %s 2>&1' % (base, mkisofs_opts)
@@ -1534,9 +1702,8 @@ if __name__ == "__main__":	#{{{
 	cdrecord_valid_opts = get_valid_opts( cdrecord_out )
 	
 	check_disk_in_drive()
-	if dvd:
-		check_dvd_disk()
-	else:	check_cd_disk()
+	if dvd:		check_dvd_disk()
+	else:		check_cd_disk()
 
 	if info:  sys.exit()
 
@@ -1544,13 +1711,10 @@ if __name__ == "__main__":	#{{{
 
 	build_file_list()
 	
-	if image:
-		check_image_file()
-	else:	check_new_session()
+	if image:	check_image_file()
+	else:		check_new_session()
 	
-	if dvd:
-		burn_dvd_disk()
-	else:	burn_cd_disk()
+	if dvd:		burn_dvd_disk()
+	else:		burn_cd_disk()
 #}}}
 	
-# vim:noet:tw=0:ts=4:sts=4:sw=4:fdm=marker
