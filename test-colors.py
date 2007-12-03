@@ -117,3 +117,17 @@ if __name__ == '__main__':
 	# __._x __._MB/s
 	# pre-formatting
 
+	print
+	print '%s?%s %sThis RW media is finalized. Do you want to blank it first? %s[%sY%s] %syes%s\n' % \
+		(COLOR_5, COLOR_0, COLOR_7, COLOR_9, COLOR_0+COLOR_5, COLOR_0+COLOR_9, COLOR_0+COLOR_3, COLOR_0)
+	print '%s?%s %sThis RW media is finalized. Do you want to blank it first? %s[%sY%s] %syes%s\n' % \
+		(COLOR_3, COLOR_0, COLOR_1, COLOR_9, COLOR_5, COLOR_9, COLOR_3, COLOR_0)
+	print '%s?%s %sThis RW media is finalized. Do you want to blank it first? %s[%sY%s] %sno%s\n' % \
+		(COLOR_3, COLOR_0, COLOR_1, COLOR_9, COLOR_5, COLOR_9, COLOR_8, COLOR_0)
+	print '%s?%s %sThis RW media is finalized. Do you want to blank it first? %s[%sY%s] %syes%s\n' % \
+		(COLOR_3, COLOR_0, COLOR_4, COLOR_9, COLOR_5, COLOR_9, COLOR_3, COLOR_0)
+	print '%s?%s %sThis RW media is finalized. Do you want to blank it first? %s[%sY%s] %syes%s\n' % \
+		(COLOR_3, COLOR_0, COLOR_5, COLOR_9, COLOR_0+COLOR_1, COLOR_0+COLOR_9, COLOR_3, COLOR_0)
+	print '%s?%s %sThis RW media is finalized. Do you want to blank it first? %s[%sY%s] %syes%s\n' % \
+		(COLOR_9, COLOR_0, COLOR_5, COLOR_9, COLOR_3, COLOR_9, COLOR_0+COLOR_1, COLOR_0)
+

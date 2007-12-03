@@ -6,6 +6,11 @@ web site:		http://burn-cd.sourceforge.net
 author:			SmART <realsmart@users.sourceforge.net>
 latest changes:
 
+    1.7.2 -- dec 03 2007:
+     - new interactive bahaviour, program will now ask the user if he wants to blank RW media
+	 - added new config option: interactive = auto/yes/no
+	 - added new command line option: --interactive=<auto/yes/no>
+
     1.7-beta1 -- dec 02 2007:
      - added support for DVD-Video
 
@@ -25,7 +30,7 @@ latest changes:
      - minor typo in the help
 
 """
-import sys, os, stat, getopt, string, time, signal, types, random, atexit
+import sys, os, stat, getopt, string, time, signal, types, random, atexit, termios, tty
 
 # config class to read and write simple config files
 class	config( object ):  #{{{
@@ -202,7 +207,7 @@ class	config( object ):  #{{{
 PROG = "burn-cd"
 
 VERSION = \
-	"%s version 1.7-beta1\n" \
+	"%s version 1.7.2\n" \
 	"Written by SmART, 2004-2007" % PROG
 
 USAGE = "Usage:  %s [options] <file_or_dir_to_burn> [...]\n" % PROG
@@ -214,21 +219,22 @@ DESCRIPTION = \
 
 HELP = \
 """Options:
-   -r<ROOT>, --root=<ROOT>    destination dir on the CD (defaults to '/')
-   -d<DEV>,  --device=<DEV>   CD-RW device (defaults to '/dev/hdc')
-   -s<N>,    --speed=<N>      tell cdrecord to burn CD on specific speed
-   -c<XYZ>,  --charset=<XYZ>  charset of the filenames (defaults to LOCALE)
-   -m<FILE>, --image=<FILE>   burn FILE as a disk image (ex. iso, bin, ...)
-   --video                    burn DIR or FILES as a DVD-Video
-   -z,       --zero           blank RW-media before burning (only if needed)
-   --nero                     try to continue rotten multisession recording
+   -r<ROOT>, --root=<ROOT>     destination dir on the CD (defaults to '/')
+   -d<DEV>,  --device=<DEV>    CD-RW device (defaults to '/dev/hdc')
+   -s<N>,    --speed=<N>       tell cdrecord to burn CD on specific speed
+   -c<XYZ>,  --charset=<XYZ>   charset of the filenames (defaults to LOCALE)
+   -m<FILE>, --image=<FILE>    burn FILE as a disk image (ex. iso, bin, ...)
+   --video                     burn DIR or FILES as a DVD-Video
+   -z,       --zero            blank RW-media before burning (only if needed)
+   --nero                      try to continue rotten multisession recording
    
-   -i, --info                 show drive/media info and exit
-   -n, --no-color             disable colors
-   -v, --verbose              show more information during the process
-   -h, --help                 show this help and exit
-   --version                  show version of the program and exit
-   --debug                    enable debug messages during the process
+   -i, --info                  show drive/media info and exit
+   -n, --no-color              disable colors
+   -v, --verbose               show more information during the process
+   -h, --help                  show this help and exit
+   --interactive=<auto/yes/no> will the program ask the user to blank RW media?
+   --version                   show version of the program and exit
+   --debug                     enable debug messages during the process
 
 Configuration:
    files:
@@ -236,14 +242,15 @@ Configuration:
       $HOME/.burn-cd.conf
 
    place there any of these:
-      device    = /dev/hdc
-      cd-speed  = auto
-      dvd-speed = auto
-      charset   = auto
-      verbose   = no
+      device      = /dev/hdc   # /dev/hdc | /dev/sr0 | ...
+      cd-speed    = auto       # auto | 8 | 16 | 24 | ...
+      dvd-speed   = auto       # auto | 2 | 4 | 8 | ...
+      charset     = auto       # auto | utf-8 | cp1251 | ...
+      verbose     = no         # yes | no
+      interactive = auto       # auto | yes | no
 """
-COLOR_0		= "\033[m"	# серый
-COLOR_1		= "\033[1m"	# жирный (bold)
+COLOR_0		= "\033[m"		# серый
+COLOR_1		= "\033[1m"		# жирный (bold)
 COLOR_2		= "\033[0;32m"	# зелёный
 COLOR_3		= "\033[1;32m"	# ярко-зелёный
 COLOR_4		= "\033[0;33m"	# жёлтый
@@ -253,8 +260,11 @@ COLOR_7		= "\033[1;36m"	# ярко-бирюзовый
 COLOR_8		= "\033[1;31m"	# ярко-красный
 COLOR_9		= "\033[1;34m"	# ярко-синий
 
-OK 		= COLOR_9+'['+COLOR_3+'ok'+COLOR_9+']'+COLOR_0
+OK			= COLOR_9+'['+COLOR_3+'ok'+COLOR_9+']'+COLOR_0
 ASTERISK	= COLOR_3+'*'+COLOR_0
+PROMPT		= COLOR_3+'>'+COLOR_0
+YES			= COLOR_3+'yes'+COLOR_0
+NO			= COLOR_8+'no'+COLOR_0
 
 mmc_profiles	= {
 	'0x0000':	'Reserved',
@@ -298,7 +308,6 @@ mmc_profiles	= {
 	'0xFFFF':	'No standard Profile'
 }
 
-# this is deprecated and not used any more
 disk_capacities	= {
 	'80mm DVD-R':		714544,
 	'80mm DVD-R/DL':	1298828,
@@ -333,6 +342,7 @@ cfg['cd-speed'] = 'auto'
 cfg['dvd-speed']= 'auto'
 cfg.charset	= 'auto'
 cfg.verbose	= 'no'
+cfg.interactive = 'auto'
 
 root		= '/'
 charset		= None
@@ -344,9 +354,11 @@ zero        = False
 verbose		= False
 info		= False
 debug		= False
+is_tty		= False
 image		= None
 nero		= False
 video		= False
+interactive	= None
 tmp_dir		= None
 
 media		= None
@@ -488,6 +500,71 @@ def get_valid_opts( prog_out ):	#{{{
 	return valid_opts
 #}}}
 
+def setup_tty():  #{{{
+    """ Disables tty line buffering on input, so that os.read could get just one char,
+        Disables input echo.
+    """
+    global is_tty
+
+    if not is_tty:  return None
+
+    fd = sys.stdin.fileno()
+    old = termios.tcgetattr( fd )
+    mode = termios.tcgetattr( fd )
+
+    IFLAG, OFLAG, CFLAG, LFLAG = 0, 1, 2, 3
+    ISPEED, OSPEED, CC = 4, 5, 6
+
+    try:
+        mode[ LFLAG ] = mode[ LFLAG ] & ~(termios.ECHO | termios.ICANON)
+        mode[ CC ][ termios.VMIN ] = 1
+        mode[ CC ][ termios.VTIME ] = 0
+        termios.tcsetattr( fd, termios.TCSADRAIN, mode )
+    except Exception, why:
+        pass
+    
+    return old
+#}}}
+def restore_tty( old ):  #{{{
+    global is_tty
+
+    if not is_tty:  return
+    
+    fd = sys.stdin.fileno()
+    try:    termios.tcsetattr( fd, termios.TCSADRAIN, old )
+    except Exception, why:
+        pass
+#}}}
+def getch():    #{{{
+    """ getch()  -->  <char>
+
+        Sets the tty into the raw mode and gets just a single char from it (without buffering),
+        then restores the tty state.
+    """
+    global is_tty
+
+    ch = ''
+    
+    if is_tty:
+        old = setup_tty()
+		fd = sys.stdin.fileno()
+        try:
+            ch = os.read( fd, 10 )
+        finally:
+            restore_tty( old )
+    else:
+        ch = sys.stdin.read(1)
+
+    return ch
+#}}}
+def get_yes_or_no( default=True ):  #{{{
+    while True:
+        ch = getch().lower()
+        if ch == '\n' and default is not None:  return default
+        elif ch == 'y':  return True
+        elif ch in ('n', chr(27)):  return False
+#}}}
+
 def run_cmd( cmd ):	#{{{
 	ch_out = os.popen( cmd )
 	out = [ s for s in ch_out ]
@@ -496,6 +573,13 @@ def run_cmd( cmd ):	#{{{
 	return out, exit_code
 #}}}
 
+def print_input_prompt( prompt, default=None ):  #{{{
+	write( '%s %s%s%s' % (PROMPT, COLOR_7, prompt, COLOR_0) )
+	if default is not None:
+		write( ' %s[%s%s%s]%s' % (COLOR_9, COLOR_5, default, COLOR_9, COLOR_0) )
+	write(' ')
+	flush()
+#}}}
 def print_debug( s, color=COLOR_4 ):	#{{{
 	if not debug:  return
 	sys.stdout.write( '%s%s%s\n' % (color, s, COLOR_0) )
@@ -573,8 +657,8 @@ def update_progress_bar( percent, first_pad=0, preformat=False ):	#{{{
 #}}}
 
 def load_config():	#{{{
-	global	cfg, charset, device, speed, verbose, \
-		global_cfg_name, local_cfg_name
+	global	cfg, charset, device, speed, verbose, is_tty, \
+			global_cfg_name, local_cfg_name, interactive
 	
 	try:	cfg.parse( file( global_cfg_name ) )
 	except:	pass
@@ -591,8 +675,16 @@ def load_config():	#{{{
 	else:	charset = val
 
 	val = cfg.verbose.lower()
-	if val in ['yes','true','1','on']:
+	if val in ['yes','true','1','on', 'enable', 'enabled']:
 		verbose = True
+
+	val = cfg.interactive.lower()
+	if val == 'auto':
+		interactive = is_tty
+	elif val in ['yes','true','1','on', 'enable', 'enabled']:
+		interactive = True
+	else:
+		interactive = False
 
 	if cfg.device:
 		device = cfg.device
@@ -605,15 +697,16 @@ def load_config():	#{{{
 	#print charset
 #}}}
 def parse_cmd_line():	#{{{
-	global	root, charset, device, speed, zero, nero, \
+	global	root, charset, device, speed, zero, nero, is_tty, interactive, \
 		verbose, info, debug, media, dvd, filenames, image, video
 
 	opts, filenames = [], []
-	try:	opts, filenames = getopt.getopt(
+	try:
+		opts, filenames = getopt.getopt(
 			sys.argv[1:], 'vnr:d:hc:is:zm:',
 			[ 'help',   'verbose',  'no-color', 'root=', 'device=',
               'speed=', 'charset=', 'version',  'info',  'debug',
-              'zero',   'nero',     'image=',   'video']
+              'zero',   'nero',     'image=',   'video', 'interactive=' ]
 		)
 	except getopt.GetoptError:
 		print
@@ -643,6 +736,14 @@ def parse_cmd_line():	#{{{
 			root = val
 		elif opt in ['-d','--device']:
 			device = val
+		elif opt == '--interactive':
+			val = val.lower()
+			if val == 'auto':
+				interactive = is_tty
+			elif val in ('y','yes','true','1','enable','enabled'):
+				interactive = True
+			else:
+				interactive = False
 		elif opt in ['-s','--speed']:
 			try:	speed = int(val)
 			except:	pass
@@ -831,7 +932,7 @@ def check_disk_in_drive():	#{{{
 #}}}
 def check_cd_disk():	#{{{
 	global	media, device, cdrecord_valid_opts, verbose, last_start, \
-		new_start, blank, free_space, total_space, zero
+		new_start, blank, free_space, total_space, zero, interactive, image
 
 	print_task( 'Checking disk type...' )
 
@@ -847,6 +948,8 @@ def check_cd_disk():	#{{{
 	flush()
 	out, exit_code = run_cmd( cmd )
 
+	ask_for_zero = False
+	ask_prompt = ''
 	appendable = True
 	blank = False
 	last_start = new_start = 0
@@ -881,6 +984,15 @@ def check_cd_disk():	#{{{
 			print_error('non blankable')
 			out += [ '.....\n', 'CD-R media can not be blanked.\n' ]
 			exit_flag = True
+		elif image and not blank:
+			print_error('not blank')
+			if 'RW' in media:
+				out = [ 'You need to blank RW-media. Add -z to the options list.\n',
+						'CAUTION: any previous information on disk will be lost\n' ]
+				ask_for_zero = interactive
+			else:
+				out += [ 'This media is not blank, exiting...\n' ]
+			exit_flag = True
 		else:
 			print OK
 			exit_flag = False
@@ -890,7 +1002,9 @@ def check_cd_disk():	#{{{
 			out += [ '.....\n',
 				 'You need to blank RW-media. Add -z to the options list.\n',
 				 'CAUTION: any previous information on disk will be lost\n' ]
-		else:	err_str = 'non writable'
+			ask_for_zero = interactive
+		else:
+			err_str = 'non writable'
 		print_error( err_str )
 		exit_flag = True
 	flush()
@@ -921,6 +1035,17 @@ def check_cd_disk():	#{{{
 	
 	if not exit_flag:  return
 
+	if ask_for_zero:
+		ask_prompt = 'Do you want to blank RW media?'
+		print_input_prompt( ask_prompt, 'Y')
+		if get_yes_or_no( default=True ):
+			zero = blank = appendable = True
+			free_space = total_space
+			print YES
+			return
+		else:
+			print NO
+
 	if verbose:
 		print_prog_out( out )
 		flush()
@@ -929,7 +1054,7 @@ def check_cd_disk():	#{{{
 def check_dvd_disk():	#{{{
 	global	media, device, cdrecord_valid_opts, disk_capacities, verbose, \
 		zero, blank, isoinfo, free_space, total_space, mkisofs_start, \
-		mkisofs_scale, video
+		mkisofs_scale, video, interactive
 
 	print_task( 'Checking disk type...' )
 
@@ -939,6 +1064,8 @@ def check_dvd_disk():	#{{{
 	flush()
 	out, exit_code = run_cmd( cmd )
 
+	ask_for_zero = False
+	ask_prompt = ''
 	blank = False
 	total_space = free_space = 0
     max_size = max_rspeed = max_wspeed = 0
@@ -1010,11 +1137,20 @@ def check_dvd_disk():	#{{{
 			print_error('not blank')
 			out += [ '.....\n', 'disk is not blank -- no way to burn DVD-Video on it\n' ]
 			exit_flag = True
+			if 'RW' in media:
+				ask_for_zero = interactive
+		elif image and not blank:
+			print_error('not blank')
+			out += [ '.....\n', 'disk is not blank -- no way to burn disk image\n' ]
+			exit_flag = True
+			if 'RW' in media:
+				ask_for_zero = interactive
 		else:
 			print OK
 			exit_flag = False
 	else:
-		#if 'RW' in media:
+		if 'RW' in media:
+			ask_for_zero = interactive
 		#	err_str = 'need to blank'
 		#	out += [ '.....\n',
 		#		 'You need to blank RW-media. Add -z to the options list.\n',
@@ -1073,6 +1209,17 @@ def check_dvd_disk():	#{{{
 		flush()
 	
 	if not exit_flag:  return
+
+	if ask_for_zero:
+		ask_prompt = 'Do you want to overwrite RW media?'
+		print_input_prompt( ask_prompt, default='Y' )
+		if get_yes_or_no( default=True ):
+			zero = blank = appendable = True
+			free_space = total_space
+			print YES
+			return
+		else:
+			print NO
 
 	if verbose:
 		print_prog_out( out )
@@ -1295,6 +1442,8 @@ def check_image_file():	#{{{
 	print_task( 'Checking image file...' )
 	flush()
 
+	assert blank == True, 'blank should be True for images!'
+
 	f = os.path.abspath( os.path.expanduser( image ) )
 	try:	f_stat = os.stat( f )
 	except:
@@ -1312,16 +1461,6 @@ def check_image_file():	#{{{
 	new_size = long( size/2048.0 + 0.9999999 )
 	image = escape_str( f )
 
-	if not blank:
-		print_error('not blank')
-		if 'RW' in media:
-			out = [ 'You need to blank RW-media. Add -z to the options list.\n',
-				'CAUTION: any previous information on disk will be lost\n' ]
-		else:
-			out += [ 'This media is not blank, exiting...\n' ]
-		print_prog_out( out )
-		sys.exit(1)
-	
 	single_session = True
 	exit_flag = False
 	mode_str = 'single session (image)'
@@ -1350,9 +1489,9 @@ def check_image_file():	#{{{
 	sys.exit(6)
 #}}}
 def check_new_session():	#{{{
-	global	verbose, charset, last_start, new_start, device, \
-		mkisofs_valid_opts, free_space, zero, nero, video, dvd, \
-		mkisofs_opts, raw_mode, single_session, new_size
+	global	verbose, charset, last_start, new_start, device, media, \
+		mkisofs_valid_opts, free_space, total_space, zero, nero, video, dvd, \
+		mkisofs_opts, raw_mode, single_session, new_size, interactive, blank
 
 	print_task( 'Calculating new session size...' )
 	flush()
@@ -1376,6 +1515,7 @@ def check_new_session():	#{{{
 	
 	ch_out, exit_code = run_cmd( cmd )
 
+	ask_for_zero = False
 	raw_mode = False
 	single_session = False
 	if blank:
@@ -1415,10 +1555,34 @@ def check_new_session():	#{{{
 			else:
 				too_big = True
 		if too_big:
-			print_error( 'too big' )
+			print_error('too big')
 			exit_flag = True
+			if not blank and 'RW' in media and new_size <= total_space:
+				ask_for_zero = interactive
 		else:
 			print OK
+
+	if ask_for_zero:
+		if dvd:	s = 'Do you want to overwrite RW media to fit the data?'
+		else:	s = 'Do you want to blank RW media to fit the data?'
+		print_input_prompt( s, 'Y' )
+		if get_yes_or_no( default=True ):
+			zero = blank = appendable = True
+			free_space = total_space
+			exit_flag = False
+			print YES
+
+			multi_overhead = 11702
+			mode_str = 'start multi-session'
+			single_session = False
+
+			delta_size = free_space - new_size
+			if delta_size < multi_overhead:
+				single_session = True
+				mode_str = 'single session'
+				multi_overhead = 0
+		else:
+			print NO
 	
 	if verbose:
 		try:	sess_size = '%.1f MB (%.1f MB)' % ((new_size+multi_overhead)/512.0,new_size/512.0)
@@ -1688,8 +1852,9 @@ if __name__ == "__main__":	#{{{
 	signal.signal( signal.SIGINT, handle_signal )
 	signal.signal( signal.SIGTERM, handle_signal )
 
-	# если stdout - не терминал, выключаем цвет
-	if not sys.stdout.isatty():  no_color()
+	is_tty = sys.stdout.isatty()
+	# если stdout - не терминал, то выключаем цвет
+	if not is_tty:  no_color()
 
 	load_config()
 	parse_cmd_line()
@@ -1707,14 +1872,13 @@ if __name__ == "__main__":	#{{{
 
 	if info:  sys.exit()
 
-	if zero and not dvd:  blank_cdrw()
-
 	build_file_list()
 	
 	if image:	check_image_file()
 	else:		check_new_session()
+
+	if zero and not dvd:  blank_cdrw()
 	
 	if dvd:		burn_dvd_disk()
 	else:		burn_cd_disk()
 #}}}
-	
