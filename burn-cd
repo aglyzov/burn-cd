@@ -6,6 +6,13 @@ web site:		http://burn-cd.sourceforge.net
 author:			SmART <realsmart@users.sourceforge.net>
 latest changes:
 
+    1.7.3 -- dec 04 2007:
+     - added new config option: umount = <umount command template>
+	   it defaults to "pumount {device}" and could be empty. If it is not empty then
+	   burn-cd will try to execute that command before any disk action.
+	 - added new command line option: --umount=<umount command template>
+	   it will precede umount value from the config
+
     1.7.2 -- dec 03 2007:
      - new interactive bahaviour, program will now ask the user if he wants to blank RW media
 	 - added new config option: interactive = auto/yes/no
@@ -207,7 +214,7 @@ class	config( object ):  #{{{
 PROG = "burn-cd"
 
 VERSION = \
-	"%s version 1.7.2\n" \
+	"%s version 1.7.3\n" \
 	"Written by SmART, 2004-2007" % PROG
 
 USAGE = "Usage:  %s [options] <file_or_dir_to_burn> [...]\n" % PROG
@@ -223,6 +230,7 @@ HELP = \
    -d<DEV>,  --device=<DEV>    CD-RW device (defaults to '/dev/hdc')
    -s<N>,    --speed=<N>       tell cdrecord to burn CD on specific speed
    -c<XYZ>,  --charset=<XYZ>   charset of the filenames (defaults to LOCALE)
+   --umount=<umount_command>   umount command template (defaults to pumount {device})
    -m<FILE>, --image=<FILE>    burn FILE as a disk image (ex. iso, bin, ...)
    --video                     burn DIR or FILES as a DVD-Video
    -z,       --zero            blank RW-media before burning (only if needed)
@@ -334,7 +342,8 @@ global_cfg_name	= '/etc/burn-cd.conf'
 try:
 	home	= os.getenv('HOME')
 	local_cfg_name = home + '/.burn-cd.conf'
-except: local_cfg_name = None
+except:
+	local_cfg_name = None
 
 cfg = config()
 cfg.device	= '/dev/hdc'
@@ -343,6 +352,7 @@ cfg['dvd-speed']= 'auto'
 cfg.charset	= 'auto'
 cfg.verbose	= 'no'
 cfg.interactive = 'auto'
+cfg.umount = 'pumount {device}'
 
 root		= '/'
 charset		= None
@@ -350,6 +360,7 @@ filenames	= None
 fnames		= None
 speed		= None 
 device		= '/dev/hdc'
+umount_cmd	= None
 zero        = False
 verbose		= False
 info		= False
@@ -591,6 +602,10 @@ def print_task( s ):	#{{{
 def print_error( s ):	#{{{
 	print COLOR_5+'['+COLOR_8+ s +COLOR_5+']'+COLOR_0
 #}}}
+def print_warning( msg, tag=None ):  #{{{
+	tag_str = tag and (tag+': ') or ''
+	write( '%s%s%s%s\n' % (COLOR_4, tag_str, msg, COLOR_0) )
+#}}}
 def print_key_value( key, val, val_color=None ):	#{{{
 	if not val_color:  val_color = COLOR_2
 	key_str = '%s:' % key
@@ -658,7 +673,7 @@ def update_progress_bar( percent, first_pad=0, preformat=False ):	#{{{
 
 def load_config():	#{{{
 	global	cfg, charset, device, speed, verbose, is_tty, \
-			global_cfg_name, local_cfg_name, interactive
+			global_cfg_name, local_cfg_name, interactive, umount_cmd
 	
 	try:	cfg.parse( file( global_cfg_name ) )
 	except:	pass
@@ -686,26 +701,19 @@ def load_config():	#{{{
 	else:
 		interactive = False
 
-	if cfg.device:
-		device = cfg.device
-	
-	# for debug purposes
-	#print global_cfg_name
-	#print local_cfg_name
-	#for s in cfg.iterstr():
-	#	print s
-	#print charset
+	device = os.path.realpath( cfg.device or device )
+	umount_cmd = cfg.umount.replace( '{device}', device )
 #}}}
 def parse_cmd_line():	#{{{
 	global	root, charset, device, speed, zero, nero, is_tty, interactive, \
-		verbose, info, debug, media, dvd, filenames, image, video
+		verbose, info, debug, media, dvd, filenames, image, video, umount_cmd
 
 	opts, filenames = [], []
 	try:
 		opts, filenames = getopt.getopt(
 			sys.argv[1:], 'vnr:d:hc:is:zm:',
 			[ 'help',   'verbose',  'no-color', 'root=', 'device=',
-              'speed=', 'charset=', 'version',  'info',  'debug',
+              'speed=', 'charset=', 'version',  'info',  'debug',   'umount=',
               'zero',   'nero',     'image=',   'video', 'interactive=' ]
 		)
 	except getopt.GetoptError:
@@ -740,10 +748,12 @@ def parse_cmd_line():	#{{{
 			val = val.lower()
 			if val == 'auto':
 				interactive = is_tty
-			elif val in ('y','yes','true','1','enable','enabled'):
+			elif val in ('y','yes','on','true','1','enable','enabled'):
 				interactive = True
 			else:
 				interactive = False
+		elif opt == '--umount':
+			umount_cmd = val.replace( '{device}', device )
 		elif opt in ['-s','--speed']:
 			try:	speed = int(val)
 			except:	pass
@@ -859,6 +869,60 @@ def check_programs():	#{{{
 		print_prog_out( out )
 		flush()
 	sys.exit(1)
+#}}}
+def umount_device():  #{{{
+	global device, umount_cmd
+
+	if not umount_cmd:  return
+
+	mounts_1 = '/proc/mounts'
+	mounts_2 = '/etc/mtab'
+
+	print_task( 'Unmounting device %s...' % device )
+
+	print_debug( 'Reading %s' % mounts_1 )
+	flush()
+	try:  f = file( mounts_1, 'r' ).readlines()
+	except:
+		print_debug( 'Reading %s' % mounts_2 )
+		flush()
+		try:  f = file( mounts_2, 'r' ).readlines()
+		except:
+			print_error('error')
+			print_warning('could not read %s nor %s files' % (mounts_1, mounts_2), tag='warning')
+			return
+	
+	match_str = device + ' '
+	is_mounted = False
+	
+	for s in f:
+		if s.startswith( match_str ):
+			is_mounted = True
+			break
+	
+	if not is_mounted:
+		print OK
+		if verbose:
+			print_key_value( 'mount point', '(not mounted)' )
+			print_key_value( 'file system', '(unknown)' )
+		return
+
+	cmd = umount_cmd + ' 2>&1'
+	print_debug( cmd )
+	flush()
+
+	out, exit_code = run_cmd( cmd )
+	if exit_code == None:
+		print OK
+		if verbose:
+			parts = s.split()
+			print_key_value( 'mount point', parts[1] )
+			print_key_value( 'file system', parts[2] )
+		return
+	
+	print_error('error')
+	print_warning( 'umount command output:\n  ' + '  '.join( out[-5:] ) )
+	flush()
 #}}}
 def check_disk_in_drive():	#{{{
 	global	cdrecord_valid_opts, media, dvd, device, mmc_profiles, \
@@ -1866,6 +1930,7 @@ if __name__ == "__main__":	#{{{
 	mkisofs_valid_opts = get_valid_opts( mkisofs_out )
 	cdrecord_valid_opts = get_valid_opts( cdrecord_out )
 	
+	umount_device()
 	check_disk_in_drive()
 	if dvd:		check_dvd_disk()
 	else:		check_cd_disk()
