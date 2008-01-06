@@ -1,16 +1,16 @@
 #!/usr/bin/python -O
-# -*- coding: cp1251 -*-
+# -*- coding: utf-8 -*-
 
-COLOR_0		= "\033[m"	# серый
-COLOR_1		= "\033[1m"	# жирный (bold)
-COLOR_2		= "\033[0;32m"	# зелёный
-COLOR_3		= "\033[1;32m"	# ярко-зелёный
-COLOR_4		= "\033[0;33m"	# жёлтый
-COLOR_5		= "\033[1;33m"	# ярко-жёлтый
-COLOR_6		= "\033[0;36m"	# бирюзовый
-COLOR_7		= "\033[1;36m"	# ярко-бирюзовый
-COLOR_8		= "\033[1;31m"	# ярко-красный
-COLOR_9		= "\033[1;34m"	# ярко-синий
+COLOR_0		= "\033[m"	# СЃРµСЂС‹Р№
+COLOR_1		= "\033[1m"	# Р¶РёСЂРЅС‹Р№ (bold)
+COLOR_2		= "\033[0;32m"	# Р·РµР»С‘РЅС‹Р№
+COLOR_3		= "\033[1;32m"	# СЏСЂРєРѕ-Р·РµР»С‘РЅС‹Р№
+COLOR_4		= "\033[0;33m"	# Р¶С‘Р»С‚С‹Р№
+COLOR_5		= "\033[1;33m"	# СЏСЂРєРѕ-Р¶С‘Р»С‚С‹Р№
+COLOR_6		= "\033[0;36m"	# Р±РёСЂСЋР·РѕРІС‹Р№
+COLOR_7		= "\033[1;36m"	# СЏСЂРєРѕ-Р±РёСЂСЋР·РѕРІС‹Р№
+COLOR_8		= "\033[1;31m"	# СЏСЂРєРѕ-РєСЂР°СЃРЅС‹Р№
+COLOR_9		= "\033[1;34m"	# СЏСЂРєРѕ-СЃРёРЅРёР№
 
 if __name__ == '__main__':
 	print
@@ -130,4 +130,18 @@ if __name__ == '__main__':
 		(COLOR_3, COLOR_0, COLOR_5, COLOR_9, COLOR_0+COLOR_1, COLOR_0+COLOR_9, COLOR_3, COLOR_0)
 	print '%s?%s %sThis RW media is finalized. Do you want to blank it first? %s[%sY%s] %syes%s\n' % \
 		(COLOR_9, COLOR_0, COLOR_5, COLOR_9, COLOR_3, COLOR_9, COLOR_0+COLOR_1, COLOR_0)
+
+
+	print "\n\n\n\n"
+
+	print 'ETA_0: %s[%s=====================%s*        %s] %s10.3%sx  %s1.5%sMB/s %s30.5%sETA%s\n' % \
+		(COLOR_9, COLOR_5, COLOR_8, COLOR_9, \
+		COLOR_0+COLOR_1, COLOR_6, COLOR_0+COLOR_1, COLOR_6, COLOR_0+COLOR_1, COLOR_6, COLOR_0)
+
+	print 'ETA_0: %s[%s=====================%s*        %s] %s10.3%sx  %s1.5%sMB/s %s--.-%sETA%s\n' % \
+		(COLOR_9, COLOR_5, COLOR_8, COLOR_9, \
+		COLOR_0+COLOR_1, COLOR_6, COLOR_0+COLOR_1, COLOR_6, COLOR_0+COLOR_1, COLOR_6, COLOR_0)
+
+
+
 

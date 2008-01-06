@@ -22,7 +22,7 @@ Define SITE-WIDE styles:
 html, body {
   font-family: verdana, bitstream vera sans, dejavu sans, tahoma, arial, sans-serif;
   color: black;
-  font-size: 12px;
+  font-size: 10pt;
   }
 
 h1 {
@@ -41,20 +41,20 @@ h2 {
 
 h3 {
   color: #054FA0;
-  margin: 36px 0 10px 0;
-  line-height: 1.3em;
-  font: 1.6em 'Verdana', 'Bitstream Vera Sans', 'DejaVu Sans', 'Tahoma', 'Arial', sans-serif;
+  margin: 0px 0 8px 0;
+  /*line-height: 1.3em;*/
+  font: 12pt 'Verdana', 'Bitstream Vera Sans', 'DejaVu Sans', 'Tahoma', 'Arial', sans-serif;
+  font-weight: bold;
   border-bottom: 1px dotted #666;
   }
 
 ul {
-  margin: 0;
+  margin: 0 0 15px 0;
 }
 
 p {
-  margin: 10px 0 6px 0;
+  margin: 0 0 25px 0;
   color: #333;
-  font-size: 11px;
   line-height: 1.5em;
   }
   
@@ -72,6 +72,10 @@ a {
 a:hover {
   color: #17BBEA;
   }
+
+.hl {
+  color: #1C8A1C;
+}
 
 
 /* HEADER CONTENT
@@ -158,11 +162,13 @@ table {
   clear: both;
   border-collapse: collapse;
   text-align: left;
+  padding: 0;
   }
 
+tr { padding: 0; margin: 0 }
+
 td {
-  padding: 2px 3px;
-  font-size: small;
+  padding: 3px 3px;
   vertical-align: top;
   }
   
@@ -172,13 +178,13 @@ td {
 
 #footer {
   text-align: right;
+  vertical-align: center;
   color: #FFF;
-  font-size: 11px;
   margin: 0;
   }
 
 #footer a {
-  color: #00F;
+  color: #b0ff70;
   }
   
 #footer a:hover {

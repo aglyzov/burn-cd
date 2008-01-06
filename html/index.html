@@ -2,12 +2,12 @@
   "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
 <head>
-  <title>burn-cd: a handy disk-burning utility</title>
+  <title>burn-cd: a handy console disk-burning utility for the modern UNIX-like OS</title>
   <meta name="verify-v1" content="IQuIEYmA494h50GcIz4Oo8gNTafbrVsnwOF9UMQgdn0=" />
   <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
   <meta http-equiv="content-language" content="en" />
-  <meta id="description" name="description" content="burn-cd: main page" />
-  <meta id="keywords" name="keywords" content="linux cd dvd disk writing burning burn write single-session multi-session auto console handy utility color python cdrecord wodim cdrkit growisofs cdrtools dvd+rw-tools" />
+  <meta id="description" name="description" content="burn-cd: a handy frontend for the unix cd/dvd writing programs" />
+  <meta id="keywords" name="keywords" content="linux unix cd dvd disk writing burning burn write single-session multi-session auto console handy utility color python cdrecord wodim cdrkit growisofs cdrtools dvd+rw-tools dvd-video dvd-image cd-image terminal ssh" />
   <link rel="shortcut icon" href="/favicon.ico" />
   <style type="text/css" media="screen">@import "/css/style.css";</style>
 </head>
@@ -20,56 +20,116 @@
         <li><a href="/" class="index">Main</a></li>
         <li><a href="/screenshots.html">Screenshots</a></li>
         <li><a href="http://sourceforge.net/project/platformdownload.php?group_id=189033">Download</a></li>
+        <li><a href="http://sourceforge.net/tracker/?group_id=189033">Bugs/Requests Tracker</a></li>
       </ul>
     </div>
   </div>
 
   <div id="content">
+    <h3>What is it</h3>
     <p>
-    Burn-CD is a handy frontend for the well-known cd/dvd writing packages
-    <a href="http://cdrecord.berlios.de/">cdrtools</a> &amp;
-    <a href="http://fy.chalmers.se/~appro/linux/DVD+RW/">dvd+rw-tools</a>.
-    It's written in the <a href="http://www.python.org/">Python</a>
-    programming language and intended for use on any modern
-    <a href="http://www.gnu.org/">GNU</a>/<a href="http://www.kernel.org/">Linux</a> OS.
+      Burn-CD is a handy frontend for the well-known cd/dvd writing packages
+      <a href="http://www.cdrkit.org/">cdrkit</a> &amp;
+      <a href="http://fy.chalmers.se/~appro/linux/DVD+RW/">dvd+rw-tools</a>.
+      It's written in the <a href="http://www.python.org/">Python</a>
+      programming language and intended for use on any modern UNIX-like system (such as
+      <a href="http://www.gnu.org/">GNU</a>/<a href="http://www.kernel.org/">Linux</a> OS).
+      <br /><br />Plese see below for the <a href="#screenshots">screenshots</a> and <a href="#examples">examples</a> of use.
     </p>
-    <p>
-    News:</p>
+
+    <h3>News</h3>
+    <h4>1.7.3 &mdash; Dec 04 2007</h4>
     <ul>
-      <li>March 18 2007 &mdash; bugfix release 1.5-beta3: fixed two DVD related bugs;</li>
+      <li>added new config option: <span class="hl">umount = &lt;umount command template&gt;</span>
+        it defaults to "pumount {device}" and could be empty. If it is not empty then
+        burn-cd will try to execute that command before any disk action.</li>
+      <li>added new command line option: <span class="hl">&mdash;umount=&lt;umount command template&gt;</span>
+        it will precede umount value from the config</li>
     </ul>
-    <p>
-    <p>
-    Features:</p>
+    <h4>1.7.2 &mdash; Dec 03 2007</h4>
     <ul>
-      <li>simple and convenient &mdash; just give it the files and dirs to burn;</li>
-      <li>supports CD&amp;DVD &mdash; use just one approach to burn any disk;</li>
-      <li>auto multisession &mdash; no need to worry about your previous data;</li>
-      <li>text based &mdash; could be used without graphics and remotely (ex. ssh, telnet);</li>
-      <li>lightweight &mdash; start writing quickly straight where you are (ex. mc, xterm);</li>
-      <li>info mode &mdash; evaluate the disk capabilities fast;</li>
-      <li>disk images &mdash; it's possible to burn the premade disk images (ex. iso, mdf);</li>
-      <li>config file &mdash; store your preferences in the config file (ex. verbose=yes);</li>
-      <li>cool progress bar &nbsp; <b>=:)</b></li>
+      <li>new interactive bahaviour, program will now <span class="hl">ask</span> the user if he wants to <span class="hl">blank RW media</span></li>
+      <li>added new config option: <span class="hl">interactive = auto/yes/no</span></li>
+      <li>added new command line option: <span class="hl">&mdash;interactive=&lt;auto/yes/no&gt;</span></li>
     </ul>
+    <h4>1.7-beta1 &mdash; Dec 02 2007</h4>
+    <ul>
+      <li>added support for <span class="hl">DVD-Video</span></li>
+    </ul>
+    <h4>1.6-beta2 &mdash; Nov 21 2007</h4>
+    <ul>
+      <li>show <span class="hl">max read/write speeds</span> for the DVD media in verbose mode</li>
+      <li>total disk capacity is now taken from the dvd+rw-mediainfo output -
+        so that fixes the issue with the 5.9 GB DL disks.</li>
+      <li>source file converted to the UTF-8 encoding</li>
+    </ul>
+    <h4>1.6-beta1 &mdash; Oct 3 2007</h4>
+    <ul>
+      <li>cdrkit and growisofs fixes</li>
+      <li>new dependancy: <span class="hl">dvd+rw-mediainfo</span> to get info about DVD media (cdrkit stopped to show that)</li>
+    </ul>
+    <h4>1.5-beta3 &mdash; Mar 18 2007</h4>
+    <ul>
+      <li>fixed two DVD related bugs</li>
+    </ul>
+    <p />
+
+    <h3>Features</h3>
+    <ul>
+      <li><span class="hl">simple and convenient</span> &mdash; just give it the files and dirs to burn;</li>
+      <li><span class="hl">supports CD&amp;DVD</span> &mdash; use just one approach to burn any disk;</li>
+      <li><span class="hl">auto multisession</span> &mdash; no need to worry about your previous data;</li>
+      <li><span class="hl">text based</span> &mdash; well suited for console/terminal use on local or remote machine (ex. ssh, telnet);</li>
+      <li><span class="hl">lightweight</span> &mdash; start writing quickly straight where you are (ex. mc, console, terminal);</li>
+      <li><span class="hl">info mode</span> &mdash; evaluate the disk capabilities fast;</li>
+      <li><span class="hl">disk images</span> &mdash; it's possible to burn the premade disk images (ex. iso, mdf);</li>
+      <li><span class="hl">config file</span> &mdash; store your preferences in the config file (ex. verbose=yes);</li>
+      <li><span class="hl">DVD-Video</span> &mdash; just give it a dir with a DVD-Video structure or even the DVD-Video files and you're done;</li>
+      <li><span class="hl">interactive behaviour</span> &mdash; if ON the program will ask if you want to blank the finalized RW media;</li>
+      <li><span class="hl">configurable umount</span> &mdash; you can setup the umount command to use before the burning;</li>
+      <li><span class="hl">cool progress bar</span> &nbsp; <b>=:)</b></li>
+    </ul>
+    <p />
+
+    <h3 id="screenshots">Screenshots</h3>
     <p>
-    It is a plain console program though it has a nice colorful output.
-    Here is a couple of examples:</p>
-    <p>
-    <a href="/shots/3.png"><img alt="picture of burn-cd at work" width="254" height="206" src="/shots/3.png" /></a>
-    <a href="/shots/5.png"><img alt="picture of burn-cd at work" width="254" height="206" src="/shots/5.png" /></a>
-    <a href="/shots/9.png"><img alt="picture of burn-cd at work" width="254" height="206" src="/shots/9.png" /></a>
+      It is a plain console program though it has a nice colorful output.
+      Here is a couple of examples:<br /><br />
+      <a href="/shots/3.png"><img alt="picture of burn-cd at work" width="254" height="206" src="/shots/3.png" /></a>
+      <a href="/shots/5.png"><img alt="picture of burn-cd at work" width="254" height="206" src="/shots/5.png" /></a>
+      <a href="/shots/9.png"><img alt="picture of burn-cd at work" width="254" height="206" src="/shots/9.png" /></a>
+      <br /><br />
+      You can see more screenshots <a href="/screenshots.html">here</a>.
     </p>
-    <p>See more screenshots <a href="/screenshots.html">here</a>.</p>
+
+    <h3 id="examples">Examples</h3>
+    <p>
+      # to show the disk and drive info<br />
+      <span class="hl">burn-cd -i</span><br />
+      <br />
+      # to burn two files and one dir verbosely<br />
+      <span class="hl">burn-cd -v file1 /some/dir/file2 /some/dir2</span><br />
+      <br />
+      # to burn a disk image<br />
+      <span class="hl">burn-cd -m disk_image.iso</span><br />
+      <br />
+      # to blank the media (if needed) and to burn the dir as a DVD-Video<br />
+      <span class="hl">burn-cd -z --video my_video/dvd/pirates2</span>
+    </p>
   </div>
 
   <div id="footer">
-    <div class="inner" style="text-align:left; float:left">
-      <a href="http://sourceforge.net"><img src="http://sflogo.sourceforge.net/sflogo.php?group_id=189033&amp;type=2" width="125" height="37" border="0" alt="SourceForge.net Logo" /></a>
-    </div>
-    <div class="inner">
-      <small>Contact the author: <a href="mailto:realsmart@users.sourceforge.net">SmART</a></small>
-    </div>
+    <table width="100%">
+      <tr>
+        <td>
+          <a href="http://sourceforge.net"><img src="http://sflogo.sourceforge.net/sflogo.php?group_id=189033&amp;type=2" width="125" height="37" border="0" alt="SourceForge.net Logo" /></a>
+        </td>
+        <td align="right" style="vertical-align: middle">
+          <a href="http://sourceforge.net/projects/burn-cd/">Project page</a> on SourceForge &nbsp;&nbsp;::&nbsp;&nbsp;
+          Contact the author: <a href="mailto:realsmart@users.sourceforge.net">SmART</a>
+        </td>
+      </tr>
+    </table>
   </div>
 </div>
 </body>

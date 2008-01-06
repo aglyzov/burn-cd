@@ -24,7 +24,7 @@ body {
 #wrapper {
   position: relative;
   width: 842px;
-  margin: 40px auto;
+  margin: 0 auto;
   padding: 0;
   border: 1px solid #24B524;
   background: #FFF;
