@@ -6,6 +6,10 @@ web site:       http://burn-cd.sourceforge.net/
 author:         SmART <realsmart@users.sourceforge.net>
 latest changes:
 
+    1.7.4 -- dec 12 2007:
+     - reverted to the old progress bar (without ETA) -- the new progress
+       bar is not good enouth yet.
+
     1.7.3 -- dec 04 2007:
      - added new config option: umount = <umount command template>
        it defaults to "pumount {device}" and could be empty. If it is not empty then
@@ -635,7 +639,7 @@ def print_prog_out( out ):  #{{{
 def update_progress_bar( percent, first_pad=0, preformat=False ):   #{{{
     global new_size, last_progress, last_time, one_speed
 
-    bar_len = 32
+    bar_len = 39
     write( '\r%s%s[' % (' '*first_pad,COLOR_9) )
     eq_len = long( round( percent*(bar_len-2) / 100.0 ) )
     sp_len = bar_len - 2 - eq_len
@@ -654,20 +658,17 @@ def update_progress_bar( percent, first_pad=0, preformat=False ):   #{{{
             delta_p = percent - last_progress
             delta_t = t - last_time
             data = new_size * delta_p / 51200.0
-            try:
-                spd = data / delta_t
-                avr_spd = (new_size * 2 * (percent/100.)) / (t - writing_start)
+            try:    spd = data / delta_t
             except: spd = one_speed
             coef = spd * 1024.0 / one_speed
-            eta=(new_size * 2 / avr_spd) - (t-writing_start)
         else:
             spd = coef = 1000.0
         if spd >= 100 or coef >= 100:
             s = ' %s--.-%sx %s--.-%sMB/s%s' % \
             (COLOR_0+COLOR_1, COLOR_6, COLOR_0+COLOR_1, COLOR_6, COLOR_0)
         else:
-            s = ' %s%4.1f%sx %s%4.1f%sMB/s%s %4.1fETA' % \
-            (COLOR_0+COLOR_1, coef, COLOR_6, COLOR_0+COLOR_1, spd, COLOR_6, COLOR_0, eta)
+            s = ' %s%4.1f%sx %s%4.1f%sMB/s%s' % \
+            (COLOR_0+COLOR_1, coef, COLOR_6, COLOR_0+COLOR_1, spd, COLOR_6, COLOR_0)
     write( s )
     last_time = t
     last_progress = percent
