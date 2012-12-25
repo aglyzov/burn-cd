@@ -1892,9 +1892,10 @@ def burn_dvd_disk():    #{{{
                 print_key_value( 'Time', writing_time )
             print_task( 'Finalizing...' )
             flush()
-            finalizing_start = time.time()
     exit_code = ch_out.close()
     #dbg.close()
+
+    finalizing_start = finalizing_start or time.time()
 
     if exit_code == None:
         print OK
