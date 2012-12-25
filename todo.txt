@@ -1,24 +1,28 @@
-[v] разобраться с неправильным выводом в aterm и в screen
-[ ] опция для "холостой" записи
-[v] опция для кривых joilet-only дисков
-[v] поддержка записи образов
-[v] поддержка записи на dvd (может новое название нужно?)
-[v] конфигурационный файл (с использованием модуля config.py)
-[ ] опция для принудительной записи в single-session режиме
-[ ] добавить заголовок лицензии GPL
-[v] добавь еще в burn-cd доп.функцию: если диск (двд-рв, например) заполнен, но
-    места не хватает для новой сессии, то предлагать очистить, и сразу записать...
-    (настройка в config: interactive = None/True/False)
-[v] вот запись DVD-Video вот это да..
-[ ] добавить ETA в progress bar
-[v] делать umount если нужно (настраивается в config: umount = pumount / <empty>)
-[ ] убрать страшный красный вывод команды если код возврата нормальный
-[ ] написать документацию (в каком-нибудь asciidoc), хотя бы readme.txt
-[v] обновить сайт
-[ ] добавить документацию на сайт
-[v] заново проиндексировать в google (с доменом .sourceforge.net вместо .sf.net)
-[ ] добавить мета файлы для сборки пакетов основных дистрибутивов (rpm, deb,
-    ebuild)
-[ ] добавить в config настройку цветов
-[ ] добавить в документацию пример файла с настройками и комментариями
-[ ] добавить опцию чтобы брать список файлов для записи из файла или stdin
+Burn-CD TODO
+------------
+
+[x] fix wrong output in aterm and screen
+[ ] add a dry-run cmd-line option
+[x] add a cmd-line option to deal with non-standard joilet-only disks
+[x] support writing ISO-images
+[x] support writing to DVD media (maybe a new name is required?)
+[x] support an optional config file (using config.py)
+[ ] add a cmd-line option to force a single-session burn
+[ ] add a GPL license header (maybe some other open-source license?)
+[x] if a disk is full (dvd-rw for instance) and there is no space for
+    another session, ask a user to clean-up the disk first and then burn
+    (config option: interactive = None/True/False)
+[x] support burning of DVD-Video
+[ ] add ETA into progress bar
+[x] make umount if necessary (config option: umount = pumount / <empty>)
+[ ] hide scary red output of a command if its exit-code is normal (i.e. 0)
+[x] update the site
+[ ] write up documentation (something like markdown or asciidoc), or at least a README.txt
+[ ] put documentation to the site
+[x] re-index the site in google (with .sourceforge.net instead of .sf.net)
+[ ] add meta files for building packages for popular distributions (rpm, deb, ebuild)
+[ ] make colors configurable throgh a config file
+[ ] add a config.example file which describes all available options
+[ ] add a cmd-line option to feed in a list of files to write from a file or stdin ("-")
+[ ] add a cmd-line option to set disk label
+
