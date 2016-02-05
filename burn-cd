@@ -6,6 +6,11 @@ web site:       http://burn-cd.sourceforge.net/
 author:         SmART <realsmart@users.sourceforge.net>
 latest changes:
 
+    1.8.0 -- oct 25 2009:
+     - add --label=<VOLID> option
+     - add --simulate option, to attempt image build before burning
+     - fix verbose manufacturer bug
+
     1.7.4 -- dec 12 2007:
      - reverted to the old progress bar (without ETA) -- the new progress
        bar is not good enouth yet.
@@ -218,8 +223,8 @@ class   config( object ):  #{{{
 PROG = "burn-cd"
 
 VERSION = \
-    "%s version 1.7.3\n" \
-    "Written by SmART, 2004-2007" % PROG
+    "%s version 1.8.0\n" \
+    "Written by SmART and others, 2004-2009" % PROG
 
 USAGE = "Usage:  %s [options] <file_or_dir_to_burn> [...]\n" % PROG
 
@@ -238,7 +243,9 @@ HELP = \
    -m<FILE>, --image=<FILE>    burn FILE as a disk image (ex. iso, bin, ...)
    --video                     burn DIR or FILES as a DVD-Video
    -z,       --zero            blank RW-media before burning (only if needed)
+   -S,       --simulate        Attempt to simulate image build before burning
    --nero                      try to continue rotten multisession recording
+   -l<VOLID>,--label=<VOLID>   specifies the volume id
 
    -i, --info                  show drive/media info and exit
    -n, --no-color              disable colors
@@ -374,7 +381,9 @@ is_tty      = False
 image       = None
 nero        = False
 video       = False
+simulation  = False
 interactive = None
+label	    = None
 tmp_dir     = None
 
 media       = None
@@ -711,15 +720,15 @@ def load_config():  #{{{
 #}}}
 def parse_cmd_line():   #{{{
     global  root, charset, device, speed, zero, nero, is_tty, interactive, \
-        verbose, info, debug, media, dvd, filenames, image, video, umount_cmd
+        verbose, info, debug, media, dvd, filenames, image, video, umount_cmd, label, simulation
 
     opts, filenames = [], []
     try:
         opts, filenames = getopt.getopt(
-            sys.argv[1:], 'vnr:d:hc:is:zm:',
+            sys.argv[1:], 'vnr:d:hc:is:zm:l:S',
             [ 'help',   'verbose',  'no-color', 'root=', 'device=',
               'speed=', 'charset=', 'version',  'info',  'debug',   'umount=',
-              'zero',   'nero',     'image=',   'video', 'interactive=' ]
+              'zero',   'nero',     'image=',   'video', 'interactive=', 'label=', 'simulate' ]
         )
     except getopt.GetoptError:
         print
@@ -773,8 +782,12 @@ def parse_cmd_line():   #{{{
         elif opt in ['-i','--info']:
             info = True
             verbose = True
+        elif opt in ['-S','--simulate']:
+            simulation = True
         elif opt in ['--video']:
             video = True
+        elif opt in ['-l','--label']:
+            label = val
 
     if not filenames and not (info or zero or image):
         print
@@ -1255,7 +1268,7 @@ def check_dvd_disk():   #{{{
     if verbose:
         print_key_value( 'Disk', disk_type )
         print_key_value( 'Physical size', disk_size )
-        if media_id:  manufacturer += '/'+media_id
+        if manufacturer and media_id:  manufacturer += '/'+media_id
         print_key_value( 'Media ID', manufacturer or 'n/a' )
         # read speed
         if max_rspeed:
@@ -1560,7 +1573,7 @@ def check_image_file(): #{{{
 def check_new_session():    #{{{
     global  verbose, charset, last_start, new_start, device, media, \
         mkisofs_valid_opts, free_space, total_space, zero, nero, video, dvd, \
-        mkisofs_opts, raw_mode, single_session, new_size, interactive, blank
+        mkisofs_opts, raw_mode, single_session, new_size, interactive, blank, label
 
     print_task( 'Calculating new session size...' )
     flush()
@@ -1572,6 +1585,12 @@ def check_new_session():    #{{{
         mkisofs_base += ' -no-rr'
     if not blank and not dvd:
         mkisofs_base += ' -C %lu,%lu -M %s' % ( last_start, new_start, device )
+    if label:
+        if len(label) < 32:
+            mkisofs_base += ' -V \'%s\'' % ( label )
+        else:
+            print_error('Error: label exceeds 32 characters')
+            sys.exit(1)
 
     mkisofs_base = filter_opts( mkisofs_base, mkisofs_valid_opts )
 
@@ -1919,6 +1938,30 @@ def burn_dvd_disk():    #{{{
     sys.exit(1)
 #}}}
 
+def simulate():		#{{{
+    global mkisofs_opts, simulation
+    if not simulation:
+        return
+    print_task( 'Simulation...' )
+    flush()
+    mkisofs_sim = 'mkisofs -o /dev/null -quiet %s 2>&1' % (mkisofs_opts)
+    cmd = mkisofs_sim
+    print_debug( cmd )
+    flush()
+
+    ch_out, exit_code = run_cmd( cmd )
+    if exit_code == None:
+        print OK
+        flush()
+        return
+
+    if verbose:
+        print_error('failed')
+        print_prog_out( ch_out )
+        flush()
+    sys.exit(1)
+#}}}
+
 if __name__ == "__main__":  #{{{
     signal.signal( signal.SIGINT, handle_signal )
     signal.signal( signal.SIGTERM, handle_signal )
@@ -1947,7 +1990,9 @@ if __name__ == "__main__":  #{{{
     build_file_list()
 
     if image:   check_image_file()
-    else:       check_new_session()
+    else:
+        check_new_session()
+        simulate()
 
     if zero and not dvd:  blank_cdrw()
 
