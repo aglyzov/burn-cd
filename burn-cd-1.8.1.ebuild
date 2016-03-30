@@ -4,22 +4,16 @@
 
 EAPI=5
 
-PYTHON_COMPAT=( python2_7 )
-inherit python-single-r1
-
-
 DESCRIPTION="Smart console frontend for the cdrkit/cdrtools & dvd+rw-tools"
 HOMEPAGE="https://github.com/aglyzov/burn-cd/"
-EGIT_REPO_URI="git://github.com/aglyzov/burn-cd.git"
-inherit git-2
-SRC_URI=""
+SRC_URI="https://github.com/aglyzov/burn-cd/archive/1.8.1.zip"
 
 LICENSE="LGPL-2"
 IUSE=""
 SLOT="0"
 KEYWORDS="~amd64 ~x86"
 
-RDEPEND="${PYTHON_DEPS}
+RDEPEND="dev-lang/python:2.7
 		 virtual/cdrtools
 		 app-cdr/dvd+rw-tools"
 
