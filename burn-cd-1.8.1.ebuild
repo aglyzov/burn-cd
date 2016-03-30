@@ -14,8 +14,8 @@ SLOT="0"
 KEYWORDS="~amd64 ~x86"
 
 RDEPEND="dev-lang/python:2.7
-		 virtual/cdrtools
-		 app-cdr/dvd+rw-tools"
+	virtual/cdrtools
+	app-cdr/dvd+rw-tools"
 
 src_install() {
 	newbin ${P} ${PN}
