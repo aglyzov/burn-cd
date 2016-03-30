@@ -6,7 +6,7 @@ EAPI=5
 
 DESCRIPTION="Smart console frontend for the cdrkit/cdrtools & dvd+rw-tools"
 HOMEPAGE="https://github.com/aglyzov/burn-cd/"
-SRC_URI="https://github.com/aglyzov/burn-cd/archive/1.8.1.zip"
+SRC_URI="https://github.com/aglyzov/${PN}/archive/${PV}.tar.gz -> ${P}.tar.gz"
 
 LICENSE="LGPL-2"
 IUSE=""
