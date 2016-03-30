@@ -1,0 +1,50 @@
+description:	a handy frontend for the cdrtools/cdrkit and dvd+rw-tools
+web sites:	https://github.com/CanuteTheGreat/burn-cd http://burn-cd.sourceforge.net/
+author:		Ronald Farrer <canutethegreat@gmail.com>, Александр Глызов <bonoba@gmail.com>, Raphaël Droz <raphael.droz@gmail.com>
+
+Changelog:
+
+1.8.1 -- January 27 2016:
+* Google Translated Russian comments into English
+* Changed default interpreter line to use python 2
+* Changed the default device from /dev/hdc to /dev/sr0
+
+1.8.0 -- oct 25 2009:
+* add --label=<VOLID> option
+* add --simulate option, to attempt image build before burning
+* fix verbose manufacturer bug
+
+1.7.4 -- dec 12 2007:
+* reverted to the old progress bar (without ETA) -- the new progress
+  bar is not good enouth yet.
+
+1.7.3 -- dec 04 2007:
+* added new config option: umount = <umount command template>
+  it defaults to "pumount {device}" and could be empty. If it is not empty then
+  burn-cd will try to execute that command before any disk action.
+* added new command line option: --umount=<umount command template>
+  it will precede umount value from the config
+
+1.7.2 -- dec 03 2007:
+* new interactive bahaviour, program will now ask the user if he wants to blank RW media
+* added new config option: interactive = auto/yes/no
+* added new command line option: --interactive=<auto/yes/no>
+
+1.7-beta1 -- dec 02 2007:
+* added support for DVD-Video
+
+1.6-beta2 -- nov 21 2007:
+* show max read/write speeds for the DVD media in verbose mode
+* total disk capacity is now taken from the dvd+rw-mediainfo output -
+  so that fixes the issue with the 5.9 GB DL disks.
+* source file converted to the UTF-8 encoding
+
+1.6-beta1 -- oct 3 2007:
+* cdrkit and growisofs fixes
+* new dependancy: dvd+rw-mediainfo to get info about DVD media (cdrkit stopped to show that)
+
+1.5-beta3 -- march 18 2007:
+* DVD speed setting is working now
+* fixed the detection of the blank DVD media
+* minor typo in the help
+

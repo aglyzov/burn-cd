@@ -1,28 +1,30 @@
-Burn-CD TODO
+Burn-CD 1.8.1 TODO
 ------------
 
 [x] fix wrong output in aterm and screen
 [ ] add a dry-run cmd-line option
-[x] add a cmd-line option to deal with non-standard joilet-only disks
+[x] add a cmd-line option to deal with non-standard joilet-only discs
 [x] support writing ISO-images
 [x] support writing to DVD media (maybe a new name is required?)
 [x] support an optional config file (using config.py)
 [ ] add a cmd-line option to force a single-session burn
-[ ] add a GPL license header (maybe some other open-source license?)
-[x] if a disk is full (dvd-rw for instance) and there is no space for
-    another session, ask a user to clean-up the disk first and then burn
+[ ] add a GPL license header 
+[x] if a disc is full (dvd-rw for instance) and there is no space for
+    another session, ask a user to clean-up the disc first and then burn
     (config option: interactive = None/True/False)
 [x] support burning of DVD-Video
 [ ] add ETA into progress bar
 [x] make umount if necessary (config option: umount = pumount / <empty>)
 [ ] hide scary red output of a command if its exit-code is normal (i.e. 0)
 [x] update the site
-[ ] write up documentation (something like markdown or asciidoc), or at least a README.txt
+[ ] write up documentation in README.md
 [ ] put documentation to the site
 [x] re-index the site in google (with .sourceforge.net instead of .sf.net)
 [ ] add meta files for building packages for popular distributions (rpm, deb, ebuild)
-[ ] make colors configurable throgh a config file
-[ ] add a config.example file which describes all available options
+[ ] make colors configurable through a config file
+[ ] add an example config file which describes all available options
 [ ] add a cmd-line option to feed in a list of files to write from a file or stdin ("-")
-[ ] add a cmd-line option to set disk label
+[ ] add a cmd-line option to set disc label
+[ ] add a cmd-line option to blank a CD-RW and DVD-RW disc and nothing else
+[ ] add a cmd-line option to write .wav files to an audio disc
 

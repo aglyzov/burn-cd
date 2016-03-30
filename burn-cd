@@ -1,94 +1,48 @@
-#!/usr/bin/python -O
+#!/usr/bin/python2 -O
 # vim: fileencoding=utf-8:et:tw=0:ts=4:sts=4:sw=4:fdm=marker
-"""
-description:    a handy frontend for the cdrtools/cdrkit and dvd+rw-tools
-web site:       http://burn-cd.sourceforge.net/
-author:         SmART <realsmart@users.sourceforge.net>
-latest changes:
-
-    1.8.0 -- oct 25 2009:
-     - add --label=<VOLID> option
-     - add --simulate option, to attempt image build before burning
-     - fix verbose manufacturer bug
-
-    1.7.4 -- dec 12 2007:
-     - reverted to the old progress bar (without ETA) -- the new progress
-       bar is not good enouth yet.
-
-    1.7.3 -- dec 04 2007:
-     - added new config option: umount = <umount command template>
-       it defaults to "pumount {device}" and could be empty. If it is not empty then
-       burn-cd will try to execute that command before any disk action.
-     - added new command line option: --umount=<umount command template>
-       it will precede umount value from the config
-
-    1.7.2 -- dec 03 2007:
-     - new interactive bahaviour, program will now ask the user if he wants to blank RW media
-     - added new config option: interactive = auto/yes/no
-     - added new command line option: --interactive=<auto/yes/no>
-
-    1.7-beta1 -- dec 02 2007:
-     - added support for DVD-Video
-
-    1.6-beta2 -- nov 21 2007:
-     - show max read/write speeds for the DVD media in verbose mode
-     - total disk capacity is now taken from the dvd+rw-mediainfo output -
-       so that fixes the issue with the 5.9 GB DL disks.
-     - source file converted to the UTF-8 encoding
-
-    1.6-beta1 -- oct 3 2007:
-     - cdrkit and growisofs fixes
-     - new dependancy: dvd+rw-mediainfo to get info about DVD media (cdrkit stopped to show that)
-
-    1.5-beta3 -- march 18 2007:
-     - DVD speed setting is working now
-     - fixed the detection of the blank DVD media
-     - minor typo in the help
-
-"""
 import sys, os, stat, getopt, string, time, signal, types, random, atexit, termios, tty
 
 # config class to read and write simple config files
 class   config( object ):  #{{{
-    """ Загружает конфигурационные параметры,
-        заданные в виде списка строк "ключ <разделитель> значение"
+    """ Load the configuration parameters,
+        given as a list of strings key <separator> value"
 
-        # в начале нужно создать экземпляр класса:
+        # in the beginning you need to create an instance of the class:
         cfg = config.config()
 
-        # также можно произвести настройку (необязательно):
+        # can also configure (optional):
         cfg.set_param( 'ignore_unknown', False )
         cfg.set_param( 'max_lines',  50 )
         cfg.set_param( 'delimiter',  ':' )
         cfg.set_param( 'preserve_type',  False )
         cfg.set_param( 'comment',    '//' )
 
-        # кроме этого можно перегрузить обработчики (необязательно):
+        # Additionally, you can overload the handlers (optional):
         handle_not_string( self, number, obj )
         handle_unknown_key( self, number, string, key )
         handle_wrong_type( self, number, string, value )
         handle_bad_format( self, number, string )
 
-        # затем присвоить значения по-умолчанию:
-        cfg.var1 = 123      # одновременно несёт информацию о типе
+        # then assign defautl values:
+        cfg.var1 = 123      # simultaneously carries information about the type
         cfg.var2 = "lala"
         cfg.var3 = 1.2345
 
-        # после этого выполнить метод .parse(...)
-        cfg.parse( source ) # source - это итерируемый объект, например
-                    # список строк или файл
+        # then execute the method .parse(...)
+        cfg.parse( source ) # source - is iterable, eg
+                    # a list of strings or a file
         print cfg.var1
 
         cfg.clear()
     """
     def __init__( self ):
         object.__setattr__( self, '_param', {} )
-        # главный словарь
+        # chief dictionary
         object.__setattr__( self, '_dict', {} )
-        # список пар (True,ключ)/(False,комментарий) по порядку
+        # a list of pairs (True,key)/(False,comment) in order
         object.__setattr__( self, '_orderlist', [] )
 
-        # параметры по-умолчанию
+        # default settings
         self.set_param( 'delimiter', '=' )
         self.set_param( 'max_lines', 10000 )
         self.set_param( 'ignore_unknown', True )
@@ -236,7 +190,7 @@ DESCRIPTION = \
 HELP = \
 """Options:
    -r<ROOT>, --root=<ROOT>     destination dir on the CD (defaults to '/')
-   -d<DEV>,  --device=<DEV>    CD-RW device (defaults to '/dev/hdc')
+   -d<DEV>,  --device=<DEV>    CD-RW device (defaults to '/dev/sr0')
    -s<N>,    --speed=<N>       tell cdrecord to burn CD on specific speed
    -c<XYZ>,  --charset=<XYZ>   charset of the filenames (defaults to LOCALE)
    --umount=<umount_command>   umount command template (defaults to pumount {device})
@@ -261,7 +215,7 @@ Configuration:
       $HOME/.burn-cd.conf
 
    place there any of these:
-      device      = /dev/hdc          # /dev/hdc | /dev/sr0 | ...
+      device      = /dev/sr0          # /dev/sr0 | /dev/cd0 | ...
       cd-speed    = auto              # auto | 8 | 16 | 24 | ...
       dvd-speed   = auto              # auto | 2 | 4 | 8 | ...
       charset     = auto              # auto | utf-8 | cp1251 | ...
@@ -269,16 +223,16 @@ Configuration:
       interactive = auto              # auto | yes | no
       umount      = pumount {device}  # pumount {device} | gnome-umount {device} | ...
 """
-COLOR_0     = "\033[m"      # серый
-COLOR_1     = "\033[1m"     # жирный (bold)
-COLOR_2     = "\033[0;32m"  # зелёный
-COLOR_3     = "\033[1;32m"  # ярко-зелёный
-COLOR_4     = "\033[0;33m"  # жёлтый
-COLOR_5     = "\033[1;33m"  # ярко-жёлтый
-COLOR_6     = "\033[0;36m"  # бирюзовый
-COLOR_7     = "\033[1;36m"  # ярко-бирюзовый
-COLOR_8     = "\033[1;31m"  # ярко-красный
-COLOR_9     = "\033[1;34m"  # ярко-синий
+COLOR_0     = "\033[m"      # gray
+COLOR_1     = "\033[1m"     # bold
+COLOR_2     = "\033[0;32m"  # green
+COLOR_3     = "\033[1;32m"  # bright green
+COLOR_4     = "\033[0;33m"  # yellow
+COLOR_5     = "\033[1;33m"  # bright yellow
+COLOR_6     = "\033[0;36m"  # turquoise
+COLOR_7     = "\033[1;36m"  # bright turquoise
+COLOR_8     = "\033[1;31m"  # bright red
+COLOR_9     = "\033[1;34m"  # bright blue
 
 OK          = COLOR_9+'['+COLOR_3+'ok'+COLOR_9+']'+COLOR_0
 ASTERISK    = COLOR_3+'*'+COLOR_0
@@ -358,7 +312,7 @@ except:
     local_cfg_name = None
 
 cfg = config()
-cfg.device  = '/dev/hdc'
+cfg.device  = '/dev/sr0'
 cfg['cd-speed'] = 'auto'
 cfg['dvd-speed']= 'auto'
 cfg.charset = 'auto'
@@ -371,7 +325,7 @@ charset     = None
 filenames   = None
 fnames      = None
 speed       = None
-device      = '/dev/hdc'
+device      = '/dev/sr0'
 umount_cmd  = None
 zero        = False
 verbose     = False
@@ -1198,7 +1152,7 @@ def check_dvd_disk():   #{{{
     if max_size:
         total_space = max_size
     else:
-        # объём диска по-умолчанию
+        # default disk capacity
         d = disk_size + ' ' + media.split( None, 1 )[0]
         total_space = disk_capacities[ d ]
 
@@ -1967,7 +1921,7 @@ if __name__ == "__main__":  #{{{
     signal.signal( signal.SIGTERM, handle_signal )
 
     is_tty = sys.stdout.isatty()
-    # если stdout - не терминал, то выключаем цвет
+    # If stdout - not terminal, then turn off color
     if not is_tty:  no_color()
 
     load_config()
