@@ -4,6 +4,9 @@
 
 EAPI=6
 
+PYTHON_COMPAT=( python2_7 )
+inherit python-r1
+
 DESCRIPTION="Smart console frontend for the cdrkit/cdrtools & dvd+rw-tools"
 HOMEPAGE="https://github.com/aglyzov/burn-cd/"
 SRC_URI="https://github.com/aglyzov/${PN}/archive/${PV}.tar.gz -> ${P}.tar.gz"
@@ -12,7 +15,8 @@ LICENSE="LGPL-2"
 SLOT="0"
 KEYWORDS="~amd64 ~x86"
 
-RDEPEND="dev-lang/python:2.7
+DEPEND="${PYTHON_DEPS}"
+RDEPEND="${DEPEND}
 	virtual/cdrtools
 	app-cdr/dvd+rw-tools"
 
